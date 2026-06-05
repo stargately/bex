@@ -159,6 +159,9 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              endpoint:
+                description: Endpoint is the raw runtime target for the edge ("host:port/prefix").
+                type: string
               image:
                 description: Image is the OCI image of the active revision.
                 type: string
@@ -176,6 +179,10 @@ spec:
                 - Running
                 - Hibernated
                 - Failed
+                type: string
+              sandboxID:
+                description: SandboxID is the runtime handle of the active revision
+                  (OpenSandbox sandbox id).
                 type: string
               url:
                 description: URL is the stable serving URL (*-<id>.bex.co).

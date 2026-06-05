@@ -92,6 +92,14 @@ type ServiceStatus struct {
 	// +optional
 	Image string `json:"image,omitempty"`
 
+	// SandboxID is the runtime handle of the active revision (OpenSandbox sandbox id).
+	// +optional
+	SandboxID string `json:"sandboxID,omitempty"`
+
+	// Endpoint is the raw runtime target for the edge ("host:port/prefix").
+	// +optional
+	Endpoint string `json:"endpoint,omitempty"`
+
 	// ObservedGeneration is the .metadata.generation the controller last reconciled.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`

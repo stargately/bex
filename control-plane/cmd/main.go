@@ -37,6 +37,7 @@ import (
 
 	appv1alpha1 "github.com/blockeden/bex/control-plane/api/v1alpha1"
 	"github.com/blockeden/bex/control-plane/internal/controller"
+	bexruntime "github.com/blockeden/bex/control-plane/internal/runtime"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -44,6 +45,14 @@ var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
+
+// envOr returns the env var k or a default.
+func envOr(k, def string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return def
+}
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
@@ -179,8 +188,11 @@ func main() {
 	}
 
 	if err := (&controller.ServiceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:     mgr.GetClient(),
+		Scheme:     mgr.GetScheme(),
+		Registry:   envOr("BEX_REGISTRY", "127.0.0.1:5050"),
+		CNBBuilder: envOr("BEX_CNB_BUILDER", "paketobuildpacks/builder-jammy-base"),
+		Runtime:    bexruntime.New(envOr("BEX_OPENSANDBOX_URL", "http://127.0.0.1:8077")),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "service")
 		os.Exit(1)
