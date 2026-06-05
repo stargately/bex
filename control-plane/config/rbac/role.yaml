@@ -1,0 +1,32 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - app.bex.co
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - app.bex.co
+  resources:
+  - services/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - app.bex.co
+  resources:
+  - services/status
+  verbs:
+  - get
+  - patch
+  - update

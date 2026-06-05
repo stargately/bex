@@ -25,12 +25,16 @@ valid swap (HelmRelease/Kustomization). Secrets via **SOPS** or **sealed-secrets
 checked in plaintext). Env differences (local OrbStack insecure-registry vs Hetzner TLS)
 go in `envs/{orbstack,hetzner}/` overlays.
 
-## Status / honesty
-This is a **scaffold**, not yet applied. To make it apply-ready:
-1. Vendor third-party charts that aren't on a Helm repo (the opensandbox-controller chart
-   ships as a GitHub-release `.tgz`) into `charts/`, or publish them to a Helm repo.
-2. Install Argo CD, then `kubectl apply -f bootstrap/app-of-apps.yaml`.
-3. Containerize the Go gateway and fill in `platform/bex-gateway.yaml`.
+## Status
+Apply-ready except for one step (a git remote):
+- ✅ opensandbox-controller chart **vendored** at `charts/opensandbox-controller` (0.2.0);
+  `helm template` renders it with our values (image `v0.2.0` + snapshot flags).
+- ✅ **Argo CD installed** into the `orbstack` cluster (`argocd` ns, 7/7 pods).
+- ✅ All Application manifests **validate** against the live Argo CRDs (`--dry-run=server`).
+- ⬜ **Remaining:** push this repo to a git remote Argo can reach, set `repoURL` in
+  `bootstrap/app-of-apps.yaml` + `platform/opensandbox-controller.yaml`, then
+  `kubectl apply -f bootstrap/app-of-apps.yaml`.
+- ⬜ Containerize the Go gateway (see `../../control-plane/`) and fill in `platform/bex-gateway.yaml`.
 
-The pinned values under `values/` already encode exactly what the MVP proved
+The pinned values under `values/` encode exactly what the MVP proved
 (controller image `v0.2.0`, snapshot registry/insecure, image-committer `v0.1.0`).
