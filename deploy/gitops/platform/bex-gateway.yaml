@@ -1,0 +1,18 @@
+# bex control plane (our Go gateway + controllers + CRDs).
+# PLACEHOLDER — fill in once the gateway is rewritten in Go and containerized:
+#   - a Deployment for the gateway/activator
+#   - our CRDs (Service, etc.) + the deploy-from-git + idle/hibernate controllers
+#   - RBAC, and (when scheduling into vclusters) the vcluster kubeconfig wiring
+# Until then the gateway runs from source (scripts/dev.sh). See docs/go-and-gitops.md §2.
+#
+# apiVersion: argoproj.io/v1alpha1
+# kind: Application
+# metadata: { name: bex-gateway, namespace: argocd }
+# spec:
+#   project: default
+#   source:
+#     repoURL: https://github.com/blockeden/bex
+#     targetRevision: main
+#     path: deploy/gitops/charts/bex-gateway   # a chart we author
+#   destination: { server: https://kubernetes.default.svc, namespace: bex-system }
+#   syncPolicy: { automated: { prune: true, selfHeal: true }, syncOptions: [CreateNamespace=true] }

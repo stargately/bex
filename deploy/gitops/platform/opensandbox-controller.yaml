@@ -1,0 +1,26 @@
+# OpenSandbox controller (BatchSandbox/Pool/SandboxSnapshot CRDs + manager).
+# Pinned to what the MVP verified: chart 0.2.0, controller image v0.2.0.
+# NOTE: the chart ships as a GitHub-release .tgz (not a Helm repo). For Argo, vendor it
+# under deploy/gitops/charts/opensandbox-controller and switch source to that git path,
+# or publish it to a Helm repo. The source below documents the pinned origin.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: opensandbox-controller
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # released as: https://github.com/alibaba/OpenSandbox/releases/download/helm/opensandbox-controller/0.2.0/opensandbox-controller-0.2.0.tgz
+    repoURL: https://github.com/blockeden/bex   # TODO: point at vendored chart path / helm repo
+    targetRevision: main
+    path: deploy/gitops/charts/opensandbox-controller
+    helm:
+      valueFiles:
+        - ../../values/opensandbox-controller.values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: opensandbox-system
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true]

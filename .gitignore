@@ -1,0 +1,11 @@
+node_modules/
+data/
+*.log
+.DS_Store
+# credentials — never commit
+*.kubeconfig
+deploy/opensandbox/*.kubeconfig
+deploy/opensandbox/sandbox.example.toml
+
+# strategy doc copy (lives in the pm knowledge base; not committed here)
+211.09-*.md

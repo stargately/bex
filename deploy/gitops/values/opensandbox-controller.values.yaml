@@ -1,0 +1,11 @@
+# Exact controller config the MVP verified. Snapshot pause/resume needs a containerd-CRI
+# node — it is BLOCKED on OrbStack (cri-dockerd); set these for a real cluster (Hetzner/k3s).
+controller:
+  image:
+    tag: v0.2.0            # chart appVersion is 0.2.0; image is tagged v0.2.0
+  snapshot:
+    # OCI registry prefix for rootfs snapshots. Use a cluster-reachable, pinned address.
+    registry: "127.0.0.1:5050/snapshots"   # OrbStack-local; on Hetzner use the in-cluster Zot service + TLS
+    registryInsecure: true                  # true only for the local insecure Zot; false in prod
+    imageCommitterImage: "sandbox-registry.cn-zhangjiakou.cr.aliyuncs.com/opensandbox/image-committer:v0.1.0"
+    # snapshotPushSecret / resumePullSecret: set (via SOPS/sealed-secrets) when the registry needs auth.

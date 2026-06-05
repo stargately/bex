@@ -1,0 +1,27 @@
+# Zot OCI registry (the build->registry->deploy hop). In-cluster Deployment + Service.
+# Uses the upstream Zot Helm repo (a real Helm repo, so this one is apply-ready).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zot
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://zotregistry.dev/helm-charts
+    chart: zot
+    targetRevision: "0.1.*"            # TODO: pin exact chart version
+    helm:
+      values: |
+        # local/dev defaults; on Hetzner front with TLS + auth and persistent storage
+        service:
+          type: ClusterIP
+          port: 5000
+        mountConfig: false
+        persistence: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bex-registry
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true]

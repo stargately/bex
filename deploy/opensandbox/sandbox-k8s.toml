@@ -1,0 +1,44 @@
+# OpenSandbox server config for bex — KUBERNETES runtime, scheduling into the
+# per-tenant vcluster "acme". Sandboxes become BatchSandbox CRs reconciled by the
+# opensandbox-controller (installed in the vcluster) into pods, which vcluster
+# syncs down to the host OrbStack cluster. Runs on :8078 (the docker-runtime
+# server stays on :8077). Start with: bash scripts/start-opensandbox-k8s.sh
+
+[server]
+host = "127.0.0.1"
+port = 8078
+max_sandbox_timeout_seconds = 86400
+
+[log]
+level = "INFO"
+
+[runtime]
+type = "kubernetes"
+execd_image = "opensandbox/execd:v1.0.16"
+
+[storage]
+allowed_host_paths = []
+volume_default_size = "1Gi"
+
+[kubernetes]
+# vcluster kubeconfig (background proxy at 127.0.0.1:12889).
+kubeconfig_path = "/Users/tianpan/projects/bex/deploy/opensandbox/vcluster-acme.kubeconfig"
+namespace = "opensandbox"
+informer_enabled = true
+informer_resync_seconds = 300
+informer_watch_timeout_seconds = 60
+workload_provider = "batchsandbox"
+image_pull_policy = "IfNotPresent"
+snapshot_create_timeout_seconds = 900
+batchsandbox_template_file = "/Users/tianpan/projects/bex/deploy/opensandbox/batchsandbox-template.yaml"
+
+[ingress]
+mode = "direct"
+
+[egress]
+image = "opensandbox/egress:v1.0.12"
+mode = "dns"
+
+[renew_intent]
+enabled = false
+min_interval_seconds = 60
