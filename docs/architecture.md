@@ -20,6 +20,17 @@ bex is **node-aware but provision-unaware**: it never adds a machine itself; it
 packs pods tightly and evicts idle ones, and the autoscaler/CAPI translate that
 into machines added/removed.
 
+**Names map to layers consistently** (layer · directory · runtime entity):
+
+| layer | directory | runtime entity |
+| --- | --- | --- |
+| **bex** | `operator/` | the **BEX OPERATOR** (deploys Apps) |
+| **bex-infra** | `infra/` | the **MANAGEMENT CLUSTER** (Cluster API; makes clusters/machines) |
+| *(substrate)* | — | the **WORKLOAD CLUSTER** — bex-infra builds it, bex runs Apps on it; the customer's cluster |
+
+The WORKLOAD CLUSTER belongs to *neither* layer cleanly — it's the substrate
+bex-infra provisions and bex deploys onto.
+
 ## `infra/` vs `deploy/` (both hold YAML — different jobs)
 
 - **`infra/`** = day-0, run **from outside** (terraform / clusterctl) to make the

@@ -16,13 +16,13 @@ source. Full design in [`docs/architecture.md`](docs/architecture.md).
                               └──────────┘                                   │
                                                                             ▼
               ┌──────────────────────────────────────────────────────────────────┐
-              │  BEX OPERATOR  —  bex's control plane   (Go, operator/)            │
+              │  BEX OPERATOR · bex   —   the control plane   (Go, operator/)      │
               │  reconcile an App:  build (CNB/Dockerfile → Zot) · place · status  │
               │  BEX_RUNTIME =     kubernetes      ──or──      opensandbox          │
               └────────────────┬────────────────────────────────┬────────────────┘
                                │ kubernetes runtime              │ opensandbox runtime
                                ▼                                 ▼
-  ╔══════════════════ WORKLOAD CLUSTER ══════════════════╗    ┌────────────────────────┐
+  ╔════════════ WORKLOAD CLUSTER · substrate ════════════╗    ┌────────────────────────┐
   ║                                                      ║    │  host OpenSandbox       │
   ║  k8s control-plane node    worker nodes (machines)   ║    │  sandbox (pause/resume  │
   ║  ┌──────────────────┐   ┌──────────────┐┌──────────┐ ║    │  snapshots)             │
@@ -34,14 +34,17 @@ source. Full design in [`docs/architecture.md`](docs/architecture.md).
                                   │ provisions / scales machines    it was created)
                                   │            (add ⇄ remove)
               ┌───────────────────┴────────────────────────────────────────┐
-              │  MANAGEMENT CLUSTER — kind  (bex-mgmt)                       │
+              │  MANAGEMENT CLUSTER · bex-infra   (kind, Cluster API)       │
               │  Cluster API  +  infrastructure provider:                   │
               │     • CAPD  → machine = Docker container     (local mock)    │
               │     • CAPH  → machine = Hetzner server       (prod — swap)   │
               │  Cluster Autoscaler → reactive add/remove from pending pods  │
               └─────────────────────────────────────────────────────────────┘
 
-  Zot registry ──(image pull)──▶ pods    ·    bex = everything above the line;  bex-infra = the management cluster
+  legend   · bex       = operator/  (the product — deploys Apps)
+           · bex-infra = infra/     (provisioning — makes clusters/machines)
+           · substrate = the workload cluster  (bex-infra builds it · bex runs Apps on it)
+  Zot registry ──(image pull)──▶ the pods.
 ```
 
 > **Two different "control planes" (don't conflate them):** the **BEX OPERATOR** (top)
