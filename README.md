@@ -8,6 +8,51 @@ swaps to **Hetzner** by changing one provider overlay.
 The control plane is a **Go Kubernetes operator**. Everything else is assembled open
 source. Full design in [`docs/architecture.md`](docs/architecture.md).
 
+## Panorama
+
+```
+                              ┌──────────┐  kubectl apply Service CR
+                              │   dev    │ ─────────────────────────────────┐
+                              └──────────┘                                   │
+                                                                            ▼
+              ┌──────────────────────────────────────────────────────────────────┐
+              │  BEX CONTROL PLANE — Go operator   (control-plane/)                │
+              │  reconcile a Service:  build (CNB/Dockerfile → Zot) · place · status│
+              │  BEX_RUNTIME =     kubernetes      ──or──      opensandbox          │
+              └────────────────┬────────────────────────────────┬────────────────┘
+                               │ kubernetes runtime              │ opensandbox runtime
+                               ▼                                 ▼
+  ╔══════════════════ WORKLOAD CLUSTER ══════════════════╗    ┌────────────────────────┐
+  ║                                                      ║    │  host OpenSandbox       │
+  ║  control-plane node        worker nodes (machines)   ║    │  sandbox (pause/resume  │
+  ║  ┌──────────────────┐   ┌──────────────┐┌──────────┐ ║    │  snapshots)             │
+  ║  │ apiserver · etcd │   │ Deployment "whoami"       │ ║    │    → hello-go           │
+  ║  │ scheduler · CM   │   │ [pod][pod][pod]│[pod][pod] │ ║    └────────────────────────┘
+  ║  └──────────────────┘   └──────────────┘└──────────┘ ║
+  ║      bex-kn4d9            worker md-0-A    md-0-B     ║       (a Service = one of these,
+  ╚═══════════════════════════════▲══════════════════════╝        in whichever cluster+runtime
+                                  │ provisions / scales machines    it was created)
+                                  │            (add ⇄ remove)
+              ┌───────────────────┴────────────────────────────────────────┐
+              │  MANAGEMENT CLUSTER — kind  (bex-mgmt)                       │
+              │  Cluster API  +  infrastructure provider:                   │
+              │     • CAPD  → machine = Docker container     (local mock)    │
+              │     • CAPH  → machine = Hetzner server       (prod — swap)   │
+              │  Cluster Autoscaler → reactive add/remove from pending pods  │
+              └─────────────────────────────────────────────────────────────┘
+
+  Zot registry ──(image pull)──▶ pods    ·    bex = everything above the line;  bex-infra = the management cluster
+```
+
+- **3 clusters**: *management* (kind, runs Cluster API → makes machines) · *workload*
+  (where your pods run; nodes = the machines) · plus the legacy `orbstack` cluster from
+  the OpenSandbox phase (where `hello-go` still lives).
+- **2 runtimes** (`BEX_RUNTIME`): `kubernetes` → a Deployment (pods on worker machines)
+  · `opensandbox` → a host sandbox (real pause/resume).
+- **machines** = worker nodes of the workload cluster — Docker containers under CAPD
+  locally, Hetzner servers under CAPH. **Add/remove a machine** = scale the worker pool;
+  the operator only watches the cluster in its `KUBECONFIG`.
+
 ## Two layers
 
 - **`bex`** (control plane, Go): build → deploy → serve, placement, the auto-allocator.
