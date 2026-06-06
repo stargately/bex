@@ -190,6 +190,7 @@ func main() {
 	if err := (&controller.ServiceReconciler{
 		Client:     mgr.GetClient(),
 		Scheme:     mgr.GetScheme(),
+		Mode:       envOr("BEX_RUNTIME", controller.ModeOpenSandbox),
 		Registry:   envOr("BEX_REGISTRY", "127.0.0.1:5050"),
 		CNBBuilder: envOr("BEX_CNB_BUILDER", "paketobuildpacks/builder-jammy-base"),
 		Runtime:    bexruntime.New(envOr("BEX_OPENSANDBOX_URL", "http://127.0.0.1:8077")),

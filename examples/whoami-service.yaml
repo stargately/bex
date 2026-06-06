@@ -1,0 +1,12 @@
+# A bex Service that runs a prebuilt image on the kubernetes runtime — pods land on
+# the cluster's machines (CAPD nodes locally, Hetzner nodes in prod). Add a machine
+# (scripts/mock-cluster.sh scale N) and bump replicas to watch pods bin-pack onto it.
+apiVersion: app.bex.co/v1alpha1
+kind: Service
+metadata:
+  name: whoami
+  namespace: default
+spec:
+  image: traefik/whoami # prebuilt image (skips the build plane); use spec.repo to build from git
+  port: 80
+  replicas: 2

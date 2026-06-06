@@ -26,9 +26,14 @@ import (
 // ServiceSpec is the desired state of a deploy-from-git Service — the Render-like
 // unit from strategy 211.09. Mirrors the Node MVP's service spec (src/api.js).
 type ServiceSpec struct {
-	// Repo is the git repository URL (or local path) to deploy from.
-	// +required
-	Repo string `json:"repo"`
+	// Repo is the git repository URL (or local path) to deploy from. Either Repo
+	// (build-from-git) or Image (prebuilt) must be set.
+	// +optional
+	Repo string `json:"repo,omitempty"`
+
+	// Image is a prebuilt OCI image to run directly, skipping the build plane.
+	// +optional
+	Image string `json:"image,omitempty"`
 
 	// Branch to track. Defaults to "main".
 	// +optional
@@ -41,6 +46,11 @@ type ServiceSpec struct {
 	// +kubebuilder:validation:Enum=auto;buildpack;dockerfile
 	// +kubebuilder:default=auto
 	Builder string `json:"builder,omitempty"`
+
+	// Replicas for the kubernetes runtime (pods bin-packed across machines/nodes).
+	// +optional
+	// +kubebuilder:default=1
+	Replicas int32 `json:"replicas,omitempty"`
 
 	// Port the application listens on (PORT is injected).
 	// +optional
