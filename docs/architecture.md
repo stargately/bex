@@ -44,12 +44,17 @@ bex-infra provisions and bex deploys onto.
   the **product runtime**, not GitOps and not infra.
 
 ```
-you/CI ─(terraform / clusterctl)─▶ infra/ ─▶ k8s cluster + nodes
-                                              │ (Argo installed)
-                                              ▼
-                       Argo ─(reconcile)─▶ deploy/gitops ─▶ platform (incl. bex)
-                                                                  │ (product runtime)
-                                              user git push ─▶ bex ─▶ sandbox on a node
+day-0    you / CI ──(terraform · clusterctl)──▶ infra/ ──▶ clusters & machines exist
+ outside                                                    (mgmt cluster + workload nodes)
+                                                               │ Argo CD installed in-cluster
+                                                               ▼
+day-1    Argo CD ──(reconcile)──▶ deploy/gitops/ ──▶ platform pods
+ inside                                               Zot · OpenSandbox-ctrl · CAPI · BEX OPERATOR
+                                                               │
+                                                               ▼
+product  user `git push` ─▶ BEX OPERATOR ─▶ build (CNB/Dockerfile → Zot) ─▶ run a revision:
+ runtime  (bex's own loop,                                  · k8s          → Deployment + pods on nodes
+          not GitOps)                                       · opensandbox  → a sandbox (pause/resume)
 ```
 
 ## Local CAPD mock → Hetzner CAPH (the portability bet)

@@ -11,55 +11,62 @@ source. Full design in [`docs/architecture.md`](docs/architecture.md).
 ## Panorama
 
 ```
-                              ┌──────────┐  kubectl apply App CR
-                              │   dev    │ ─────────────────────────────────┐
-                              └──────────┘                                   │
-                                                                            ▼
-              ┌──────────────────────────────────────────────────────────────────┐
-              │  BEX OPERATOR · bex   —   the control plane   (Go, operator/)      │
-              │  reconcile an App:  build (CNB/Dockerfile → Zot) · place · status  │
-              │  BEX_RUNTIME =     kubernetes      ──or──      opensandbox          │
-              └────────────────┬────────────────────────────────┬────────────────┘
-                               │ kubernetes runtime              │ opensandbox runtime
-                               ▼                                 ▼
-  ╔════════════ WORKLOAD CLUSTER · substrate ════════════╗    ┌────────────────────────┐
-  ║                                                      ║    │  host OpenSandbox       │
-  ║  k8s control-plane node    worker nodes (machines)   ║    │  sandbox (pause/resume  │
-  ║  ┌──────────────────┐   ┌──────────────┐┌──────────┐ ║    │  snapshots)             │
-  ║  │ apiserver · etcd │   │ Deployment "whoami"       │ ║    │    → hello-go           │
-  ║  │ scheduler · CM   │   │ [pod][pod][pod]│[pod][pod] │ ║    └────────────────────────┘
-  ║  └──────────────────┘   └──────────────┘└──────────┘ ║
-  ║      bex-kn4d9            worker md-0-A    md-0-B     ║       (an App = one of these,
-  ╚═══════════════════════════════▲══════════════════════╝        in whichever cluster+runtime
-                                  │ provisions / scales machines    it was created)
-                                  │            (add ⇄ remove)
-              ┌───────────────────┴────────────────────────────────────────┐
-              │  MANAGEMENT CLUSTER · bex-infra   (kind, Cluster API)       │
-              │  Cluster API  +  infrastructure provider:                   │
-              │     • CAPD  → machine = Docker container     (local mock)    │
-              │     • CAPH  → machine = Hetzner server       (prod — swap)   │
-              │  Cluster Autoscaler → reactive add/remove from pending pods  │
-              └─────────────────────────────────────────────────────────────┘
+  dev   $ kubectl apply -f App.yaml
+    │
+    ▼
+  ╔══ MANAGEMENT CLUSTER ════════════════════════════════ bex-infra · infra/ ══╗
+  ║ machine ×1   —   kind node   bex-mgmt-control-plane                        ║
+  ║                                                                            ║
+  ║ pods ▸ Cluster API   capi · capd · kubeadm-bootstrap · kubeadm-cp          ║
+  ║      ▸ BEX OPERATOR  · bex ·  reconcile App → Deployment                   ║
+  ║        (prod = a pod here   ·   local dev = host  go run  :8081)           ║
+  ╚════════════════════════════════════════════════════════════════════════════╝
+        │
+        │  bex operator → Deployment into the workload cluster (its KUBECONFIG)
+        │  Cluster API  → provisions machines  (add ⇄ remove)
+        │                 CAPD → Docker container   ·   CAPH → Hetzner server
+        ▼
+  ╔══ WORKLOAD CLUSTER ══════════════════════ substrate · your Apps run here ══╗
+  ║ control-plane node       worker machines (CAPI provisions these)           ║
+  ║                                                                            ║
+  ║ ┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐     ║
+  ║ │ bex-kn4d9          │  │ bex-md-0…2fn7c     │  │ bex-md-0…jw4sv     │     ║
+  ║ │ apiserver · etcd   │  │                    │  │                    │     ║
+  ║ │ scheduler · CM     │  │ [ whoami  pod ]    │  │ [ whoami  pod ]    │     ║
+  ║ │ (tainted: no apps) │  │                    │  │                    │     ║
+  ║ └────────────────────┘  └────────────────────┘  └────────────────────┘     ║
+  ║                                                                            ║
+  ║ add a machine ⇒ new node joins · pods bin-pack onto it                     ║
+  ╚════════════════════════════════════════════════════════════════════════════╝
+                                    ▲  image pull
+                    bex-zot   ·   registry container  (:5050)
 
-  legend   · bex       = operator/  (the product — deploys Apps)
-           · bex-infra = infra/     (provisioning — makes clusters/machines)
-           · substrate = the workload cluster  (bex-infra builds it · bex runs Apps on it)
-  Zot registry ──(image pull)──▶ the pods.
+  ── alternate runtime ─ BEX_RUNTIME=opensandbox ─ single host · NOT the k8s path ──
+     host OpenSandbox (:8077) → sandbox container  [ hello-go ]    real pause/resume
+     k8s variant: opensandbox-controller in the legacy  orbstack  vcluster (acme)
+
+  levels   machine = a server (Hetzner) / Docker container (local mock)
+           cluster = k8s built FROM machines      pod = a process inside a cluster
+  layers   · bex        operator/   build → deploy → serve Apps      (the product)
+           · bex-infra  infra/      Cluster API — makes clusters & machines
+           · substrate  the workload cluster (bex-infra builds it · bex runs Apps)
+  count    machines now = 1 (mgmt) + 1 control-plane + 2 workers.   operator, CAPI
+           and zot are pods/containers — NOT extra machines.   Hetzner: CAPD→CAPH.
 ```
 
-> **Two different "control planes" (don't conflate them):** the **BEX OPERATOR** (top)
-> is bex's *platform* control plane — it decides what to deploy. The **k8s control-plane
-> node** (inside the workload cluster) is that cluster's own master (apiserver/etcd/
-> scheduler). The operator is a *client* of the k8s control-plane node.
+> **Two "control planes" — don't conflate.** The **BEX OPERATOR** (`· bex`) is the
+> *platform* control plane: it decides what to deploy. The **control-plane node**
+> inside a cluster (apiserver/etcd/scheduler) is that *cluster's* own master. The
+> operator is a **client** of those apiservers — a pod, not a node, not a machine.
 
-- **3 clusters**: *management* (kind, runs Cluster API → makes machines) · *workload*
-  (where your pods run; nodes = the machines) · plus the legacy `orbstack` cluster from
-  the OpenSandbox phase (where `hello-go` still lives).
-- **2 runtimes** (`BEX_RUNTIME`): `kubernetes` → a Deployment (pods on worker machines)
-  · `opensandbox` → a host sandbox (real pause/resume).
-- **machines** = worker nodes of the workload cluster — Docker containers under CAPD
-  locally, Hetzner servers under CAPH. **Add/remove a machine** = scale the worker pool;
-  the operator only watches the cluster in its `KUBECONFIG`.
+- **Two clusters, not four boxes.** Only `MANAGEMENT CLUSTER` and `WORKLOAD CLUSTER`
+  are Kubernetes clusters; `BEX OPERATOR`, Cluster API and `bex-zot` are **pods /
+  containers inside** them — they cost **no extra machines**. On Hetzner the machines
+  are the cluster **nodes**; swap `CAPD`→`CAPH` and the picture is identical. (A 3rd
+  legacy `orbstack` cluster still hosts the OpenSandbox `hello-go` demo.)
+- **machines = nodes** of the workload cluster — Docker containers under CAPD locally,
+  Hetzner servers under CAPH. **Add/remove a machine** = scale the worker pool; the
+  operator only watches the cluster in its `KUBECONFIG` and bin-packs pods onto nodes.
 
 ## Two layers
 
