@@ -1,5 +1,5 @@
-# Cluster API management cluster (kind). The Docker socket is mounted so the
-# Cluster API Docker provider (CAPD) can create workload-cluster nodes as Docker
+# bex infra cluster — the Cluster API management cluster (kind). The Docker socket is mounted so the
+# Cluster API Docker provider (CAPD) can create app-cluster nodes as Docker
 # containers on the host daemon.
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4

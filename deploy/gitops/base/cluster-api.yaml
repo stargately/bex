@@ -1,5 +1,5 @@
 # Cluster API + provider controllers — the node-provisioning ENGINE (installed into
-# the management cluster). The desired node pools it consumes (Cluster /
+# the infra cluster). The desired node pools it consumes (Cluster /
 # MachineDeployment) live in infra/clusterapi/ (NOT here): engine = deploy/, desired
 # infrastructure = infra/.
 #

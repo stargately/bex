@@ -8,7 +8,7 @@ only reads k8s `Node`/`Pod` objects (provision-unaware).
 
 ```
 infra/
-├── terraform/     base IaC substrate (mgmt cluster, network, LB) — Hetzner; not needed locally
+├── terraform/     base IaC substrate (infra cluster, network, LB) — Hetzner; not needed locally
 ├── clusterapi/    node lifecycle via Cluster API (NodePool ≡ MachineDeployment)
 │   ├── base/          shared: namespace, cluster-autoscaler wiring
 │   └── overlays/
@@ -25,7 +25,7 @@ infra/
 | provider | **CAPD** (Docker) | **CAPH** (Hetzner) |
 | "machine" | a Docker container node | a Hetzner server / bare-metal |
 | overlay | `clusterapi/overlays/local-capd` | `clusterapi/overlays/hetzner-caph` |
-| base substrate | kind mgmt cluster (`infra/local`) | `infra/terraform` |
+| base substrate | kind infra cluster (`infra/local`) | `infra/terraform` |
 
 Add/remove a machine = change `MachineDeployment.replicas` (or let Cluster
 Autoscaler do it from pending pods). The mechanism is the same; only the provider

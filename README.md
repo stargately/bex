@@ -11,10 +11,10 @@ source. Full design in [`docs/architecture.md`](docs/architecture.md).
 ## Panorama
 
 ```
-  dev   $ kubectl apply -f App.yaml   ─▶ the workload cluster's apiserver
+  dev   $ kubectl apply -f App.yaml   ─▶ the app cluster's apiserver
     │
     ▼
-  ╔══ WORKLOAD CLUSTER ════════════════ substrate · bex + your Apps run here ══╗
+  ╔══ APP CLUSTER ═════════════════════ substrate · bex + your Apps run here ══╗
   ║ ▸ BEX OPERATOR · bex  —  a POD in this cluster   (watches App CRs)         ║
   ║     reconcile App → Deployment + Service ──▶ pods on the workers below     ║
   ║     local mock: pinned to the control-plane node (see note ‡)              ║
@@ -35,7 +35,7 @@ source. Full design in [`docs/architecture.md`](docs/architecture.md).
         │  (pods pull their image from here)        │
         └──────────────────────────────┐            │
                                         ▼            │
-  ╔══ MANAGEMENT CLUSTER ════════════════════════════════ bex-infra · infra/ ══╗
+  ╔══ INFRA CLUSTER ═════════════════════════════════════ bex-infra · infra/ ══╗
   ║ machine ×1   —   kind node   bex-mgmt-control-plane                        ║
   ║ Cluster API pods:  capi · capd · kubeadm-bootstrap · kubeadm-cp            ║
   ║ CAPD → Docker container (local mock)   ·   CAPH → Hetzner server (prod)    ║
@@ -47,10 +47,11 @@ source. Full design in [`docs/architecture.md`](docs/architecture.md).
 
   levels   machine = a server (Hetzner) / Docker container (local mock)
            cluster = k8s built FROM machines      pod = a process inside a cluster
-  layers   · bex        operator/  — runs as a POD in the workload cluster
-           · bex-infra  infra/      — the MANAGEMENT CLUSTER (Cluster API)
-           · substrate  the workload cluster (bex-infra builds it · bex+Apps run in it)
-  count    machines = 1 (mgmt) + 1 control-plane + 2 workers.  BEX OPERATOR, CAPI and
+  layers   · bex        operator/  — runs as a POD in the app cluster
+           · bex-infra  infra/      — the INFRA CLUSTER (Cluster API)
+           · substrate  the app cluster (bex-infra builds it · bex+Apps run in it)
+  names    infra cluster / app cluster = Cluster API's management / workload cluster
+  count    machines = 1 (infra) + 1 control-plane + 2 workers.  BEX OPERATOR, CAPI and
            zot are pods/containers — NOT extra machines.  Nothing runs on your laptop.
   ‡ local mock only: pinned to the cp node because OrbStack/Calico can't route cross-
     node pod→apiserver (same gap crashes calico-kube-controllers); real CNI needs no pin.
@@ -61,13 +62,14 @@ source. Full design in [`docs/architecture.md`](docs/architecture.md).
 > node** (apiserver/etcd/scheduler) is the *cluster's* own master. The operator is a
 > **client** of that apiserver — it runs in-cluster, **never on your laptop**.
 
-- **Two clusters.** `WORKLOAD CLUSTER` runs the bex operator **and** your Apps;
-  `MANAGEMENT CLUSTER` runs only Cluster API (it provisions the workload's machines).
+- **Two clusters.** The **app cluster** runs the bex operator **and** your Apps; the
+  **infra cluster** runs only Cluster API (it provisions the app cluster's machines).
   `BEX OPERATOR`, Cluster API and `bex-zot` are **pods / containers** — no extra
   machines. On Hetzner the machines are the cluster **nodes**; swap `CAPD`→`CAPH` and
-  the picture is identical. (A 3rd legacy `orbstack` cluster still hosts the OpenSandbox
-  `hello-go` demo.)
-- **machines = nodes** of the workload cluster — Docker containers under CAPD locally,
+  the picture is identical. (*infra cluster* / *app cluster* are bex's names for Cluster
+  API's *management* / *workload* cluster; a 3rd legacy `orbstack` cluster still hosts
+  the OpenSandbox `hello-go` demo.)
+- **machines = nodes** of the app cluster — Docker containers under CAPD locally,
   Hetzner servers under CAPH. **Add/remove a machine** = scale the worker pool; the
   operator bin-packs pods onto the nodes.
 
@@ -107,12 +109,12 @@ spec:
 Prereqs: Docker (OrbStack), Go ≥ 1.22, `kubectl`, `kind`, `clusterctl`.
 
 ```bash
-# 1. stand up the mock Hetzner substrate: kind mgmt cluster + Cluster API + CAPD
-#    + a workload cluster whose nodes are Docker containers (+ Calico CNI).
+# 1. stand up the mock Hetzner substrate: kind infra cluster + Cluster API + CAPD
+#    + an app cluster whose nodes are Docker containers (+ Calico CNI).
 bash scripts/mock-cluster.sh            # writes infra/local/bex.kubeconfig
 export KUBECONFIG=$PWD/infra/local/bex.kubeconfig
 
-# 2. deploy bex AS A POD in the workload cluster (kubernetes runtime). Build the operator
+# 2. deploy bex AS A POD in the app cluster (kubernetes runtime). Build the operator
 #    image, load it into every node's containerd (CAPD can't pull a local-only image), deploy.
 ( cd operator && make docker-build IMG=bex-operator:dev )
 docker save bex-operator:dev -o /tmp/bex-op.tar

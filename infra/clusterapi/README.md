@@ -6,7 +6,7 @@ under `deploy/gitops/base/cluster-api.yaml`) reconcile them into real nodes.
 
 - **`base/`** — shared, provider-agnostic bits (namespace, cluster-autoscaler
   annotations, MachineDeployment replica defaults used as patch targets).
-- **`overlays/local-capd/`** — the full CAPD workload-cluster manifest (Docker
+- **`overlays/local-capd/`** — the full CAPD app-cluster manifest (Docker
   containers as machines). Generated with `clusterctl generate cluster ... --infrastructure docker`. Used by `infra/local`.
 - **`overlays/hetzner-caph/`** — the CAPH equivalent (Hetzner). Same `Cluster` /
   `MachineDeployment` shape; provider-specific `*MachineTemplate`. [seam]

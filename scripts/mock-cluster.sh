@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Stand up the local CAPD mock of the Hetzner substrate, entirely in Docker:
-#   kind management cluster -> Cluster API + Docker provider (CAPD) -> a workload
+#   kind infra cluster -> Cluster API + Docker provider (CAPD) -> an app
 #   cluster whose "machines" are Docker-container nodes. Add/remove a machine by
 #   scaling the worker pool. Swap CAPD -> CAPH for Hetzner; bex is unchanged.
 #
@@ -19,23 +19,23 @@ scale() {
 }
 if [ "${1:-}" = scale ]; then scale "${2:?usage: scale N}"; exit 0; fi
 
-# 1. management cluster (kind) with the docker socket mounted (CAPD needs it)
+# 1. infra cluster (kind) with the docker socket mounted (CAPD needs it)
 kind get clusters 2>/dev/null | grep -qx bex-mgmt || kind create cluster --config infra/local/kind-mgmt.yaml
 kubectl config use-context "$MGMT" >/dev/null
 
 # 2. Cluster API core + Docker provider (topology enabled from the start)
 kubectl get ns capd-system >/dev/null 2>&1 || clusterctl init --infrastructure docker
 
-# 3. the workload cluster (Cluster + ClusterClass + MachineDeployment, machines = containers)
+# 3. the app cluster (Cluster + ClusterClass + MachineDeployment, machines = containers)
 kubectl apply -f infra/clusterapi/overlays/local-capd/cluster.yaml
 
-echo "waiting for the workload cluster to provision..."
+echo "waiting for the app cluster to provision..."
 kubectl --context "$MGMT" wait --for=condition=Available cluster/bex --timeout=600s || true
 for i in $(seq 1 60); do
   [ "$(kubectl --context "$MGMT" get machines --no-headers 2>/dev/null | grep -c Running)" -ge 2 ] && break; sleep 8
 done
 
-# 4. workload kubeconfig — rewrite the server to the lb's host-published port
+# 4. app-cluster kubeconfig — rewrite the server to the lb's host-published port
 #    (CAPD's internal API IP isn't reachable from the host), then install a CNI.
 clusterctl get kubeconfig bex > "$WL_KUBECONFIG"
 LBPORT=$(docker port bex-lb 6443/tcp | head -1 | sed 's/.*://')
@@ -45,7 +45,7 @@ KUBECONFIG="$WL_KUBECONFIG" kubectl apply -f \
 KUBECONFIG="$WL_KUBECONFIG" kubectl wait --for=condition=Ready node --all --timeout=300s || true
 
 echo
-echo "workload cluster 'bex' up. kubeconfig: $WL_KUBECONFIG"
+echo "app cluster 'bex' up. kubeconfig: $WL_KUBECONFIG"
 echo "  nodes:        KUBECONFIG=$WL_KUBECONFIG kubectl get nodes"
 echo "  add machine:  bash scripts/mock-cluster.sh scale 3"
 echo "  remove:       bash scripts/mock-cluster.sh scale 1"

@@ -24,11 +24,11 @@ into machines added/removed.
 
 | layer | directory | runtime entity |
 | --- | --- | --- |
-| **bex** | `operator/` | the **BEX OPERATOR** — a **pod in the workload cluster** (deploys Apps) |
-| **bex-infra** | `infra/` | the **MANAGEMENT CLUSTER** (Cluster API; makes clusters/machines) |
-| *(substrate)* | — | the **WORKLOAD CLUSTER** — runs the bex operator **and** your Apps; bex-infra builds it |
+| **bex** | `operator/` | the **BEX OPERATOR** — a **pod in the app cluster** (deploys Apps) |
+| **bex-infra** | `infra/` | the **INFRA CLUSTER** (Cluster API; makes clusters/machines) |
+| *(substrate)* | — | the **APP CLUSTER** — runs the bex operator **and** your Apps; bex-infra builds it |
 
-The WORKLOAD CLUSTER belongs to *neither* layer cleanly — it's the substrate
+The APP CLUSTER belongs to *neither* layer cleanly — it's the substrate
 bex-infra provisions, and it hosts both the bex operator pod and the user Apps.
 The operator runs **in-cluster** (a `Deployment` in `bex-system`), never on a laptop;
 `make run` from source is only a dev inner-loop.
@@ -47,7 +47,7 @@ The operator runs **in-cluster** (a `Deployment` in `bex-system`), never on a la
 
 ```
 day-0    you / CI ──(terraform · clusterctl)──▶ infra/ ──▶ clusters & machines exist
- outside                                                    (mgmt cluster + workload nodes)
+ outside                                                    (infra cluster + app-cluster nodes)
                                                                │ Argo CD installed in-cluster
                                                                ▼
 day-1    Argo CD ──(reconcile)──▶ deploy/gitops/ ──▶ platform pods
@@ -69,7 +69,7 @@ locally, in Docker, then swap the provider for Hetzner.
 | --- | --- | --- |
 | provider | **CAPD** (Docker) | **CAPH** (Hetzner cloud + bare-metal) |
 | "machine" | Docker-container node | Hetzner server |
-| mgmt cluster | `kind` (`infra/local`) | `infra/terraform` |
+| infra cluster | `kind` (`infra/local`) | `infra/terraform` |
 | node-pool overlay | `infra/clusterapi/overlays/local-capd` | `…/hetzner-caph` |
 | microVMs (Kata/FC) | not available | bare-metal (Robot) |
 
