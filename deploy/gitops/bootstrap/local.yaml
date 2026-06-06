@@ -1,18 +1,19 @@
-# Argo CD root "app-of-apps": reconciles everything under platform/.
-# Apply once (after Argo CD is installed): kubectl apply -f bootstrap/app-of-apps.yaml
+# Per-env app-of-apps entrypoint (local). Apply once after Argo CD is installed:
+#   kubectl apply -f deploy/gitops/bootstrap/local.yaml
+# It points Argo at the local overlay, which renders the platform Applications.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: bex-platform
+  name: bex-platform-local
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
-    repoURL: https://github.com/blockeden/bex # TODO: set to this repo's URL
+    repoURL: https://github.com/blockeden/bex # TODO: set to this repo's remote
     targetRevision: main
-    path: deploy/gitops/platform
+    path: deploy/gitops/overlays/local
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd

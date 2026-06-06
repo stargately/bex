@@ -1,0 +1,12 @@
+# Local (OrbStack / kind) overlay. References the shared base and applies
+# local-only differences (insecure registry, single replicas, CAPD provider).
+# Apply via ../../bootstrap/local.yaml (the per-env app-of-apps entrypoint).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+# Local patches go here as they materialize, e.g.:
+# patches:
+#   - target: { kind: Application, name: zot }
+#     patch: |-      # local Zot stays insecure/no-TLS
+#       - { op: add, path: /metadata/annotations/bex.env, value: local }

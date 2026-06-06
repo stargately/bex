@@ -1,0 +1,10 @@
+# Shared baseline: the set of platform Argo Applications installed into every
+# environment. Per-env differences live in ../overlays/<env>/ (which reference this).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - zot.yaml                     # OCI registry (build -> registry -> deploy)
+  - opensandbox-controller.yaml  # OpenSandbox BatchSandbox/Pool/SandboxSnapshot CRDs + controller
+  - bex.yaml                     # the bex control plane (operator + gateway)
+  - cluster-api.yaml             # Cluster API + provider controllers (the node-provisioning engine)
+  - autoscaler.yaml              # Cluster Autoscaler (reacts to pending pods -> add/remove machines)

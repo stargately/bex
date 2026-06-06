@@ -1,0 +1,6 @@
+# Shared, provider-agnostic Cluster API bits. The full provider-specific cluster
+# manifests live in ../overlays/{local-capd,hetzner-caph}/. Materialized as needed
+# (e.g. a `bex-system` namespace, cluster-autoscaler annotations on MachineDeployments).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: []

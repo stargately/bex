@@ -17,7 +17,7 @@ spec:
     path: deploy/gitops/charts/opensandbox-controller
     helm:
       valueFiles:
-        - ../../values/opensandbox-controller.values.yaml
+        - ../../base/values/opensandbox-controller.values.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: opensandbox-system

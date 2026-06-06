@@ -1,40 +1,45 @@
-# bex platform GitOps (scaffold)
+# bex platform GitOps
 
-This directory is the **platform substrate** as declarative, version-pinned state —
-the GitOps answer from [`docs/go-and-gitops.md`](../../docs/go-and-gitops.md):
+The **platform substrate** as declarative, version-pinned state, reconciled by Argo CD.
 
 > **GitOps the platform; never GitOps the per-deploy user workloads** (those are bex's
-> product runtime — webhook → build → deploy).
+> product runtime — webhook → build → deploy). And cluster/node *creation* lives in
+> [`infra/`](../../infra/), not here (engine vs. desired-infra — see
+> [docs/architecture.md](../../docs/architecture.md)).
 
-It converts the imperative MVP setup (`helm install …`, `vcluster create …`, `kubectl …`)
-into reproducible Git state, pinned to the versions the MVP verified.
+## Layout (base + overlays)
 
-## What's in scope here
-- Cluster addons: **Zot** registry (later: ingress/cert-manager, Loki/Prometheus).
-- **OpenSandbox controller** + CRDs (chart `0.2.0`, image `v0.2.0`) incl. snapshot config.
-- **bex control plane** (our Go gateway/controllers) — once containerized (placeholder).
-- Per-tenant **vcluster** provisioning — via `ApplicationSet` (future).
+```
+deploy/gitops/
+├── bootstrap/
+│   ├── local.yaml          per-env app-of-apps entrypoint → overlays/local
+│   ├── staging.yaml        (seam)
+│   └── prod.yaml           (seam)
+├── base/                   shared platform components (one Argo Application each)
+│   ├── zot.yaml            OCI registry
+│   ├── opensandbox-controller.yaml   CRDs + controller (chart 0.2.0, image v0.2.0)
+│   ├── bex.yaml            the bex control plane
+│   ├── cluster-api.yaml    CAPI/provider controllers (engine; desired pools in infra/)
+│   ├── autoscaler.yaml     Cluster Autoscaler (reactive add/remove machines)
+│   ├── values/             default values
+│   └── kustomization.yaml
+├── overlays/               per-env differences only (reference ../base)
+│   ├── local/              insecure registry, single replicas, CAPD
+│   ├── staging/  (seam)
+│   └── prod/     (seam)
+└── charts/                 vendored Helm charts (opensandbox-controller, …)
+```
 
-## What's NOT here (by design)
-- User **service revisions** — driven by the bex gateway at runtime, not GitOps.
-- **Cluster/node creation** — infra (Terraform on Hetzner; OrbStack locally).
-
-## Tooling
-Argo CD **app-of-apps** (`bootstrap/app-of-apps.yaml` → `platform/*`). Flux is an equally
-valid swap (HelmRelease/Kustomization). Secrets via **SOPS** or **sealed-secrets** (none
-checked in plaintext). Env differences (local OrbStack insecure-registry vs Hetzner TLS)
-go in `envs/{orbstack,hetzner}/` overlays.
+`base/` is the Kustomize **baseline** (the components common to every env);
+`overlays/<env>/` reference it and patch only what differs; `bootstrap/<env>.yaml`
+is the Argo entrypoint that points at one overlay.
 
 ## Status
-Apply-ready except for one step (a git remote):
-- ✅ opensandbox-controller chart **vendored** at `charts/opensandbox-controller` (0.2.0);
-  `helm template` renders it with our values (image `v0.2.0` + snapshot flags).
-- ✅ **Argo CD installed** into the `orbstack` cluster (`argocd` ns, 7/7 pods).
-- ✅ All Application manifests **validate** against the live Argo CRDs (`--dry-run=server`).
-- ⬜ **Remaining:** push this repo to a git remote Argo can reach, set `repoURL` in
-  `bootstrap/app-of-apps.yaml` + `platform/opensandbox-controller.yaml`, then
-  `kubectl apply -f bootstrap/app-of-apps.yaml`.
-- ⬜ Containerize the Go gateway (see `../../control-plane/`) and fill in `platform/bex-gateway.yaml`.
+- ✅ opensandbox-controller chart **vendored** (`charts/opensandbox-controller`, 0.2.0);
+  renders with pinned values (image `v0.2.0` + snapshot flags).
+- ✅ Argo CD installed in the cluster; Application manifests validate (`--dry-run=server`).
+- ⬜ Push to a git remote, set `repoURL` in `bootstrap/local.yaml` (+ components), then
+  `kubectl apply -f bootstrap/local.yaml`.
+- ⬜ Containerize the Go control plane → fill in `base/bex.yaml`.
 
-The pinned values under `values/` encode exactly what the MVP proved
-(controller image `v0.2.0`, snapshot registry/insecure, image-committer `v0.1.0`).
+Secrets via **SOPS** / **sealed-secrets** (never plaintext).
