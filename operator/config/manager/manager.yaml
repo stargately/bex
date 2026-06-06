@@ -65,6 +65,9 @@ spec:
           - --health-probe-bind-address=:8081
         image: controller:latest
         name: manager
+        env:
+          - name: BEX_RUNTIME
+            value: kubernetes
         ports:
         - containerPort: 8081
           name: health

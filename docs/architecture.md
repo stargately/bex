@@ -24,12 +24,14 @@ into machines added/removed.
 
 | layer | directory | runtime entity |
 | --- | --- | --- |
-| **bex** | `operator/` | the **BEX OPERATOR** (deploys Apps) |
+| **bex** | `operator/` | the **BEX OPERATOR** — a **pod in the workload cluster** (deploys Apps) |
 | **bex-infra** | `infra/` | the **MANAGEMENT CLUSTER** (Cluster API; makes clusters/machines) |
-| *(substrate)* | — | the **WORKLOAD CLUSTER** — bex-infra builds it, bex runs Apps on it; the customer's cluster |
+| *(substrate)* | — | the **WORKLOAD CLUSTER** — runs the bex operator **and** your Apps; bex-infra builds it |
 
 The WORKLOAD CLUSTER belongs to *neither* layer cleanly — it's the substrate
-bex-infra provisions and bex deploys onto.
+bex-infra provisions, and it hosts both the bex operator pod and the user Apps.
+The operator runs **in-cluster** (a `Deployment` in `bex-system`), never on a laptop;
+`make run` from source is only a dev inner-loop.
 
 ## `infra/` vs `deploy/` (both hold YAML — different jobs)
 
