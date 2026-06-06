@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Stand up the local CAPD mock of the Hetzner substrate, entirely in Docker:
+#   kind management cluster -> Cluster API + Docker provider (CAPD) -> a workload
+#   cluster whose "machines" are Docker-container nodes. Add/remove a machine by
+#   scaling the worker pool. Swap CAPD -> CAPH for Hetzner; bex is unchanged.
+#
+#   bash scripts/mock-cluster.sh            # bring it up
+#   bash scripts/mock-cluster.sh scale 3    # set worker machines = 3 (add/remove)
+set -euo pipefail
+cd "$(dirname "$0")/.."
+export CLUSTER_TOPOLOGY=true                 # CAPD's flavor uses ClusterClass/topology
+MGMT=kind-bex-mgmt
+WL_KUBECONFIG=infra/local/bex.kubeconfig
+
+scale() {
+  kubectl --context "$MGMT" patch cluster bex --type merge \
+    -p "{\"spec\":{\"topology\":{\"workers\":{\"machineDeployments\":[{\"name\":\"md-0\",\"class\":\"default-worker\",\"replicas\":$1}]}}}}"
+  echo "worker pool -> $1 machine(s); watch: docker ps --format '{{.Names}}' | grep bex-md-0"
+}
+if [ "${1:-}" = scale ]; then scale "${2:?usage: scale N}"; exit 0; fi
+
+# 1. management cluster (kind) with the docker socket mounted (CAPD needs it)
+kind get clusters 2>/dev/null | grep -qx bex-mgmt || kind create cluster --config infra/local/kind-mgmt.yaml
+kubectl config use-context "$MGMT" >/dev/null
+
+# 2. Cluster API core + Docker provider (topology enabled from the start)
+kubectl get ns capd-system >/dev/null 2>&1 || clusterctl init --infrastructure docker
+
+# 3. the workload cluster (Cluster + ClusterClass + MachineDeployment, machines = containers)
+kubectl apply -f infra/clusterapi/overlays/local-capd/cluster.yaml
+
+echo "waiting for the workload cluster to provision..."
+kubectl --context "$MGMT" wait --for=condition=Available cluster/bex --timeout=600s || true
+for i in $(seq 1 60); do
+  [ "$(kubectl --context "$MGMT" get machines --no-headers 2>/dev/null | grep -c Running)" -ge 2 ] && break; sleep 8
+done
+
+# 4. workload kubeconfig — rewrite the server to the lb's host-published port
+#    (CAPD's internal API IP isn't reachable from the host), then install a CNI.
+clusterctl get kubeconfig bex > "$WL_KUBECONFIG"
+LBPORT=$(docker port bex-lb 6443/tcp | head -1 | sed 's/.*://')
+sed -i '' "s#server: https://[0-9.]*:6443#server: https://127.0.0.1:$LBPORT#" "$WL_KUBECONFIG"
+KUBECONFIG="$WL_KUBECONFIG" kubectl apply -f \
+  https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/calico.yaml >/dev/null
+KUBECONFIG="$WL_KUBECONFIG" kubectl wait --for=condition=Ready node --all --timeout=300s || true
+
+echo
+echo "workload cluster 'bex' up. kubeconfig: $WL_KUBECONFIG"
+echo "  nodes:        KUBECONFIG=$WL_KUBECONFIG kubectl get nodes"
+echo "  add machine:  bash scripts/mock-cluster.sh scale 3"
+echo "  remove:       bash scripts/mock-cluster.sh scale 1"

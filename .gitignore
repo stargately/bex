@@ -9,3 +9,6 @@ deploy/opensandbox/sandbox.example.toml
 
 # strategy doc copy (lives in the pm knowledge base; not committed here)
 211.09-*.md
+
+# CAPD workload cluster kubeconfig (credential)
+infra/local/*.kubeconfig
