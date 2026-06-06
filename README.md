@@ -11,25 +11,25 @@ source. Full design in [`docs/architecture.md`](docs/architecture.md).
 ## Panorama
 
 ```
-                              ┌──────────┐  kubectl apply Service CR
+                              ┌──────────┐  kubectl apply App CR
                               │   dev    │ ─────────────────────────────────┐
                               └──────────┘                                   │
                                                                             ▼
               ┌──────────────────────────────────────────────────────────────────┐
-              │  BEX CONTROL PLANE — Go operator   (control-plane/)                │
-              │  reconcile a Service:  build (CNB/Dockerfile → Zot) · place · status│
+              │  BEX OPERATOR  —  bex's control plane   (Go, operator/)            │
+              │  reconcile an App:  build (CNB/Dockerfile → Zot) · place · status  │
               │  BEX_RUNTIME =     kubernetes      ──or──      opensandbox          │
               └────────────────┬────────────────────────────────┬────────────────┘
                                │ kubernetes runtime              │ opensandbox runtime
                                ▼                                 ▼
   ╔══════════════════ WORKLOAD CLUSTER ══════════════════╗    ┌────────────────────────┐
   ║                                                      ║    │  host OpenSandbox       │
-  ║  control-plane node        worker nodes (machines)   ║    │  sandbox (pause/resume  │
+  ║  k8s control-plane node    worker nodes (machines)   ║    │  sandbox (pause/resume  │
   ║  ┌──────────────────┐   ┌──────────────┐┌──────────┐ ║    │  snapshots)             │
   ║  │ apiserver · etcd │   │ Deployment "whoami"       │ ║    │    → hello-go           │
   ║  │ scheduler · CM   │   │ [pod][pod][pod]│[pod][pod] │ ║    └────────────────────────┘
   ║  └──────────────────┘   └──────────────┘└──────────┘ ║
-  ║      bex-kn4d9            worker md-0-A    md-0-B     ║       (a Service = one of these,
+  ║      bex-kn4d9            worker md-0-A    md-0-B     ║       (an App = one of these,
   ╚═══════════════════════════════▲══════════════════════╝        in whichever cluster+runtime
                                   │ provisions / scales machines    it was created)
                                   │            (add ⇄ remove)
@@ -43,6 +43,11 @@ source. Full design in [`docs/architecture.md`](docs/architecture.md).
 
   Zot registry ──(image pull)──▶ pods    ·    bex = everything above the line;  bex-infra = the management cluster
 ```
+
+> **Two different "control planes" (don't conflate them):** the **BEX OPERATOR** (top)
+> is bex's *platform* control plane — it decides what to deploy. The **k8s control-plane
+> node** (inside the workload cluster) is that cluster's own master (apiserver/etcd/
+> scheduler). The operator is a *client* of the k8s control-plane node.
 
 - **3 clusters**: *management* (kind, runs Cluster API → makes machines) · *workload*
   (where your pods run; nodes = the machines) · plus the legacy `orbstack` cluster from
@@ -70,11 +75,11 @@ source. Full design in [`docs/architecture.md`](docs/architecture.md).
 | `kubernetes` | a **Deployment** (pods on cluster machines) | the elastic, multi-machine path (CAPD/Hetzner) |
 | `opensandbox` | an OpenSandbox sandbox (host Docker) | real `pause`/`resume` snapshots; single host |
 
-## The `Service` resource
+## The `App` resource
 
 ```yaml
 apiVersion: app.bex.co/v1alpha1
-kind: Service
+kind: App
 metadata: { name: whoami }
 spec:
   image: traefik/whoami     # prebuilt image; OR build from git with `repo:` + `branch:`
@@ -82,7 +87,7 @@ spec:
   replicas: 2               # pods bin-pack across machines
 ```
 
-`kubectl get services.app.bex.co` shows phase / revision / url.
+`kubectl get apps.app.bex.co` shows phase / revision / url.
 
 ## Quickstart: local CAPD mock (machines = Docker containers)
 
@@ -95,44 +100,44 @@ bash scripts/mock-cluster.sh            # writes infra/local/bex.kubeconfig
 
 # 2. run bex against the workload cluster (kubernetes runtime)
 export KUBECONFIG=$PWD/infra/local/bex.kubeconfig
-( cd control-plane && make install )
-( cd control-plane && BEX_RUNTIME=kubernetes make run ) &
+( cd operator && make install )
+( cd operator && BEX_RUNTIME=kubernetes make run ) &
 
-# 3. deploy a Service — pods land on the CAPD machines
-kubectl apply -f examples/whoami-service.yaml
-kubectl get pods -l app.bex.co/service=whoami -o wide   # see them on bex-md-0-* nodes
+# 3. deploy an App — pods land on the CAPD machines
+kubectl apply -f examples/whoami-app.yaml
+kubectl get pods -l app.bex.co/app=whoami -o wide   # see them on bex-md-0-* nodes
 
-# 4. ★ add a machine, then scale the Service onto it
+# 4. ★ add a machine, then scale the App onto it
 bash scripts/mock-cluster.sh scale 2    # worker pool 1 -> 2 (a new container node joins)
-kubectl patch service.app.bex.co whoami --type merge -p '{"spec":{"replicas":6}}'
-kubectl get pods -l app.bex.co/service=whoami -o wide   # pods now spread across both machines
+kubectl patch apps.app.bex.co whoami --type merge -p '{"spec":{"replicas":6}}'
+kubectl get pods -l app.bex.co/app=whoami -o wide   # pods now spread across both machines
 ```
 
 ## Deploy to Hetzner (same bex, different provider)
 
 Only the infrastructure overlay changes — `infra/clusterapi/overlays/local-capd` →
 `…/hetzner-caph` (a real CAPH manifest is committed there). The bex control plane and
-the `Service`/Deployment are byte-for-byte identical. See
+the `App`/Deployment are byte-for-byte identical. See
 [`infra/README.md`](infra/README.md) and the overlay README.
 
 ## Layout
 
 ```
-control-plane/   Go operator (kubebuilder)
-  api/v1alpha1/   Service CRD          internal/build/    build plane (CNB/Dockerfile → Zot)
+operator/   Go operator (kubebuilder)
+  api/v1alpha1/   App CRD          internal/build/    build plane (CNB/Dockerfile → Zot)
   cmd/            manager entrypoint   internal/runtime/   OpenSandbox client
   config/         CRD/RBAC kustomize   internal/controller/ reconcile: kubernetes + opensandbox runtimes
 infra/           bex-infra: terraform/ · clusterapi/{base,overlays/{local-capd,hetzner-caph}} · local/
 deploy/          gitops/{bootstrap,base,overlays/{local,staging,prod},charts} · opensandbox/ server configs
-examples/        whoami-service.yaml (prebuilt), hello-go/ (build-from-git sample)
+examples/        whoami-app.yaml (prebuilt), hello-go/ (build-from-git sample)
 docs/            architecture.md · go-and-gitops.md
 scripts/         mock-cluster.sh · up.sh · deploy-sample.sh · start-opensandbox*.sh
 ```
 
 ## Status
 
-Working & verified: the **Go control plane** (Service CRD + reconcile, finalizer
-teardown); the **kubernetes runtime** (Service → Deployment → pods on machines); the
+Working & verified: the **Go control plane** (App CRD + reconcile, finalizer
+teardown); the **kubernetes runtime** (App → Deployment → pods on machines); the
 **local CAPD mock** with **add/remove machine** and pods bin-packing onto added
 machines; the **opensandbox runtime** (build CNB/Dockerfile → Zot → sandbox, real
 pause/resume); the **Hetzner CAPH overlay** (manifest committed, not applied — no account).

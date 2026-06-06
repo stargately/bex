@@ -1,7 +1,7 @@
 # bex control plane (our Go gateway + controllers + CRDs).
 # PLACEHOLDER — fill in once the gateway is rewritten in Go and containerized:
 #   - a Deployment for the gateway/activator
-#   - our CRDs (Service, etc.) + the deploy-from-git + idle/hibernate controllers
+#   - our CRDs (App, etc.) + the deploy-from-git + idle/hibernate controllers
 #   - RBAC, and (when scheduling into vclusters) the vcluster kubeconfig wiring
 # Until then the gateway runs from source (scripts/dev.sh). See docs/go-and-gitops.md §2.
 #

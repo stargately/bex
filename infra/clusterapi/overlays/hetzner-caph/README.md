@@ -18,7 +18,7 @@ provider**:
 | add/remove machine | scale the worker pool | scale the worker pool |
 
 **bex is byte-for-byte identical** on both — it only creates k8s Deployments/Services
-and reads `Node`s (see `control-plane/`). To go live:
+and reads `Node`s (see `operator/`). To go live:
 
 ```
 export HCLOUD_TOKEN=...                 # via SOPS/sealed-secrets in real use

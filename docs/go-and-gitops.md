@@ -47,7 +47,7 @@ Zot, BuildKit, containerd, CNB `pack`/lifecycle, the OpenSandbox **controller**,
 What "mostly Go" means concretely:
 
 - The bex pieces map cleanly onto **Go k8s controllers + a gateway service**:
-  - `Service` CRD + controller (deploy-from-git revisions) — kubebuilder/controller-runtime.
+  - `App` CRD + controller (deploy-from-git revisions) — kubebuilder/controller-runtime.
   - idle/hibernate controller (reconciles activity → pause), wake-on-request **activator**
     (Knative-style, Go).
   - gateway HTTP service (E2B/ACP wire + webhook receiver) using `client-go` and the
@@ -125,7 +125,7 @@ Go control plane a home in the same substrate.
 ## 5. Next steps
 1. Scaffold `deploy/gitops/` (done as a starting point — see that dir).
 2. Containerize the (Go) gateway so it can be an Argo `Application` like everything else.
-3. Begin the Go control plane: `Service` CRD + controller + activator (kubebuilder),
+3. Begin the Go control plane: `App` CRD + controller + activator (kubebuilder),
    reusing the Node MVP as the spec.
 4. For k8s-mode pause/resume: move off OrbStack k8s to a containerd-CRI cluster (kind/k3s
    locally, Hetzner for real).

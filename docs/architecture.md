@@ -13,7 +13,7 @@ The single most important boundary:
 | owns | placement, lifecycle, build→deploy→serve, the **auto-allocator** | clusters + machines |
 | node awareness | **reads** `Node`/`Pod` (capacity, utilization); decides placement/eviction | **creates/joins/deletes** nodes |
 | provisioning | ❌ never SSHes / runs cloud APIs | ✅ Terraform, Cluster API, autoscaler |
-| code | Go (`control-plane/`) | declarative (`infra/`) |
+| code | Go (`operator/`) | declarative (`infra/`) |
 | how it scales machines | **indirectly**: bin-pack + idle-evict → pending pods / empty nodes | Cluster Autoscaler / CAPI react |
 
 bex is **node-aware but provision-unaware**: it never adds a machine itself; it
@@ -58,10 +58,10 @@ locally, in Docker, then swap the provider for Hetzner.
 ## Build → deploy → serve (the product)
 
 1. **build** — clone repo @ ref → Dockerfile (BuildKit) or Cloud Native Buildpacks
-   (`pack`) → OCI image → push to **Zot** (`control-plane/internal/build`).
+   (`pack`) → OCI image → push to **Zot** (`operator/internal/build`).
 2. **deploy** — run the image as a revision on **OpenSandbox** (Docker runtime, or
-   k8s runtime → a pod) (`control-plane/internal/runtime`); health-gate; record
-   `Service` status (`internal/controller`).
+   k8s runtime → a pod) (`operator/internal/runtime`); health-gate; record
+   `App` status (`internal/controller`).
 3. **serve** — reach the revision via the runtime endpoint (future: a stable
    `*-<id>.bex.co` URL via the gateway).
 4. **sleep = free** — idle → OpenSandbox `pause`; request → `resume` (the gateway
@@ -70,7 +70,7 @@ locally, in Docker, then swap the provider for Hetzner.
 ## Repo map
 
 ```
-control-plane/   Go operator (+ future gateway): api/ internal/{build,runtime,controller,allocator,gateway} cmd/
+operator/   Go operator (+ future gateway): api/ internal/{build,runtime,controller,allocator,gateway} cmd/
 infra/           bex-infra: terraform/ clusterapi/{base,overlays/{local-capd,hetzner-caph}} local/
 deploy/          GitOps: gitops/{bootstrap,base,overlays/{local,staging,prod},charts} + opensandbox/ server configs
 examples/        sample user apps (hello-go)
