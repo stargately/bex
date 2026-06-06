@@ -1,0 +1,11 @@
+apiVersion: app.bex.co/v1alpha1
+kind: App
+metadata:
+  labels:
+    app.kubernetes.io/name: bex
+    app.kubernetes.io/managed-by: kustomize
+  name: app-sample
+spec:
+  image: traefik/whoami # or build from git with repo: + branch:
+  port: 80
+  replicas: 2

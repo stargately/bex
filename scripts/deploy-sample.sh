@@ -15,7 +15,7 @@ git -C "$REPO" commit -q -m "hello-go"
 
 kubectl apply -f - <<YAML
 apiVersion: app.bex.co/v1alpha1
-kind: Service
+kind: App
 metadata:
   name: hello-go
   namespace: default
@@ -29,5 +29,5 @@ spec:
 YAML
 
 echo "applied Service hello-go (repo $REPO)"
-echo "watch:  kubectl get services.app.bex.co -w"
-echo "serve:  curl \$(kubectl get service.app.bex.co hello-go -o jsonpath='{.status.url}')/"
+echo "watch:  kubectl get apps.app.bex.co -w"
+echo "serve:  curl \$(kubectl get apps.app.bex.co hello-go -o jsonpath='{.status.url}')/"

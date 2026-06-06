@@ -6,7 +6,6 @@ metadata:
 rules:
 - apiGroups:
   - ""
-  - app.bex.co
   resources:
   - services
   verbs:
@@ -20,13 +19,25 @@ rules:
 - apiGroups:
   - app.bex.co
   resources:
-  - services/finalizers
+  - apps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - app.bex.co
+  resources:
+  - apps/finalizers
   verbs:
   - update
 - apiGroups:
   - app.bex.co
   resources:
-  - services/status
+  - apps/status
   verbs:
   - get
   - patch

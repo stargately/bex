@@ -27,10 +27,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appv1alpha1 "github.com/blockeden/bex/control-plane/api/v1alpha1"
+	appv1alpha1 "github.com/blockeden/bex/operator/api/v1alpha1"
 )
 
-var _ = Describe("Service Controller", func() {
+var _ = Describe("App Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
@@ -40,13 +40,13 @@ var _ = Describe("Service Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		service := &appv1alpha1.Service{}
+		service := &appv1alpha1.App{}
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind Service")
+			By("creating the custom resource for the Kind App")
 			err := k8sClient.Get(ctx, typeNamespacedName, service)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &appv1alpha1.Service{
+				resource := &appv1alpha1.App{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,16 +59,16 @@ var _ = Describe("Service Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &appv1alpha1.Service{}
+			resource := &appv1alpha1.App{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Cleanup the specific resource instance Service")
+			By("Cleanup the specific resource instance App")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &ServiceReconciler{
+			controllerReconciler := &AppReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}

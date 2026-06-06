@@ -1,4 +1,4 @@
-module github.com/blockeden/bex/control-plane
+module github.com/blockeden/bex/operator
 
 go 1.25.7
 

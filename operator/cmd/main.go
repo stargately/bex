@@ -35,9 +35,9 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	appv1alpha1 "github.com/blockeden/bex/control-plane/api/v1alpha1"
-	"github.com/blockeden/bex/control-plane/internal/controller"
-	bexruntime "github.com/blockeden/bex/control-plane/internal/runtime"
+	appv1alpha1 "github.com/blockeden/bex/operator/api/v1alpha1"
+	"github.com/blockeden/bex/operator/internal/controller"
+	bexruntime "github.com/blockeden/bex/operator/internal/runtime"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -187,7 +187,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&controller.ServiceReconciler{
+	if err := (&controller.AppReconciler{
 		Client:     mgr.GetClient(),
 		Scheme:     mgr.GetScheme(),
 		Mode:       envOr("BEX_RUNTIME", controller.ModeOpenSandbox),

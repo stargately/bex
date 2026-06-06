@@ -23,9 +23,9 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// ServiceSpec is the desired state of a deploy-from-git Service — the Render-like
+// AppSpec is the desired state of a deploy-from-git App — the Render-like
 // unit from strategy 211.09. Mirrors the Node MVP's service spec (src/api.js).
-type ServiceSpec struct {
+type AppSpec struct {
 	// Repo is the git repository URL (or local path) to deploy from. Either Repo
 	// (build-from-git) or Image (prebuilt) must be set.
 	// +optional
@@ -71,24 +71,24 @@ type ServiceSpec struct {
 	IdleTTLSeconds int32 `json:"idleTTLSeconds,omitempty"`
 }
 
-// ServicePhase mirrors the lifecycle state machine (211.09 §Agent Lifecycle).
+// AppPhase mirrors the lifecycle state machine (211.09 §Agent Lifecycle).
 // +kubebuilder:validation:Enum=Pending;Building;Deploying;Running;Hibernated;Failed
-type ServicePhase string
+type AppPhase string
 
 const (
-	PhasePending    ServicePhase = "Pending"
-	PhaseBuilding   ServicePhase = "Building"
-	PhaseDeploying  ServicePhase = "Deploying"
-	PhaseRunning    ServicePhase = "Running"
-	PhaseHibernated ServicePhase = "Hibernated"
-	PhaseFailed     ServicePhase = "Failed"
+	PhasePending    AppPhase = "Pending"
+	PhaseBuilding   AppPhase = "Building"
+	PhaseDeploying  AppPhase = "Deploying"
+	PhaseRunning    AppPhase = "Running"
+	PhaseHibernated AppPhase = "Hibernated"
+	PhaseFailed     AppPhase = "Failed"
 )
 
-// ServiceStatus is the observed state of a Service.
-type ServiceStatus struct {
+// AppStatus is the observed state of a App.
+type AppStatus struct {
 	// Phase is the high-level lifecycle state.
 	// +optional
-	Phase ServicePhase `json:"phase,omitempty"`
+	Phase AppPhase `json:"phase,omitempty"`
 
 	// URL is the stable serving URL (*-<id>.bex.co).
 	// +optional
@@ -128,32 +128,32 @@ type ServiceStatus struct {
 // +kubebuilder:printcolumn:name="URL",type=string,JSONPath=`.status.url`
 // +kubebuilder:printcolumn:name="Repo",type=string,JSONPath=`.spec.repo`,priority=1
 
-// Service is the Schema for the services API
-type Service struct {
+// App is the Schema for the services API
+type App struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// metadata is a standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitzero"`
 
-	// spec defines the desired state of Service
+	// spec defines the desired state of App
 	// +required
-	Spec ServiceSpec `json:"spec"`
+	Spec AppSpec `json:"spec"`
 
-	// status defines the observed state of Service
+	// status defines the observed state of App
 	// +optional
-	Status ServiceStatus `json:"status,omitzero"`
+	Status AppStatus `json:"status,omitzero"`
 }
 
 // +kubebuilder:object:root=true
 
-// ServiceList contains a list of Service
-type ServiceList struct {
+// AppList contains a list of App
+type AppList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitzero"`
-	Items           []Service `json:"items"`
+	Items           []App `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Service{}, &ServiceList{})
+	SchemeBuilder.Register(&App{}, &AppList{})
 }

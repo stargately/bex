@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/blockeden/bex/control-plane/test/utils"
+	"github.com/blockeden/bex/operator/test/utils"
 )
 
 // namespace where the project is deployed in

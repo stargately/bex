@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Bring up the bex substrate locally: Zot registry + OpenSandbox server + the
-# Service CRD. Idempotent. After this: `cd control-plane && make run`.
+# Service CRD. Idempotent. After this: `cd operator && make run`.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p data
@@ -25,11 +25,11 @@ fi
 echo "OpenSandbox: $(curl -s -m2 http://127.0.0.1:8077/health || echo DOWN)"
 
 # 3. Service CRD into the cluster.
-echo "installing Service CRD..."
-( cd control-plane && make install >/dev/null 2>&1 )
-kubectl get crd services.app.bex.co --no-headers 2>/dev/null | awk '{print "CRD:",$1}'
+echo "installing App CRD..."
+( cd operator && make install >/dev/null 2>&1 )
+kubectl get crd apps.app.bex.co --no-headers 2>/dev/null | awk '{print "CRD:",$1}'
 
 echo
 echo "substrate up. Next:"
-echo "  cd control-plane && make run        # run the Go control plane"
+echo "  cd operator && make run        # run the Go control plane"
 echo "  bash scripts/deploy-sample.sh       # deploy the Go sample app"
