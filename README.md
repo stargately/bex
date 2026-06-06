@@ -1,106 +1,98 @@
-# bex — webhook → build → deploy → serve (Go control plane)
+# bex — deploy-from-git on an elastic, multi-machine substrate
 
-bex is the **deploy-from-git half** of [bex.co](docs/go-and-gitops.md) (strategy 211.09):
-a Git repo becomes a running, addressable service. The control plane is a **Go
-Kubernetes operator**; the substrate is assembled from open source — Cloud Native
-Buildpacks, the Zot registry, OpenSandbox, Kubernetes + vcluster.
+bex is the **deploy-from-git half** of bex.co (strategy 211.09): a Git repo (or a
+prebuilt image) becomes a running service, scheduled across machines that are
+**added/removed elastically** — and the whole thing runs **locally as a mock** that
+swaps to **Hetzner** by changing one provider overlay.
 
-```
-Service CR ─▶ build (OCI image) ─▶ deploy revision ─▶ serve
-            (CNB / Dockerfile)     (OpenSandbox)
-```
+The control plane is a **Go Kubernetes operator**. Everything else is assembled open
+source. Full design in [`docs/architecture.md`](docs/architecture.md).
 
-## Architecture
+## Two layers
 
-| Concern | What | Where |
+- **`bex`** (control plane, Go): build → deploy → serve, placement, the auto-allocator.
+  Node-aware, **provision-unaware** — it only reads `Node`/`Pod` and creates Deployments.
+- **`bex-infra`** (`infra/`): how clusters and machines *exist* — Cluster API + a
+  provider (CAPD locally, CAPH on Hetzner), Cluster Autoscaler, Terraform.
+
+`infra/` makes the cluster (day-0, from outside); `deploy/` is what Argo reconciles
+*into* it (day-1+). bex never references `infra/`.
+
+## Runtimes (`BEX_RUNTIME`)
+
+| | runs a revision as | use |
 | --- | --- | --- |
-| **Control plane** | Go kubebuilder operator: `Service` CRD + reconcile | `control-plane/` |
-| ↳ build plane | clone repo @ ref → Dockerfile (BuildKit) or CNB `pack` → push to Zot | `control-plane/internal/build` |
-| ↳ runtime | OpenSandbox Lifecycle API client (create / endpoint / pause / resume / delete) | `control-plane/internal/runtime` |
-| **Registry** | Zot (OCI) | `127.0.0.1:5050` |
-| **Runtime substrate** | OpenSandbox → Docker, or → Kubernetes (BatchSandbox CR → pod in a vcluster) | `deploy/opensandbox/`, `scripts/start-opensandbox*.sh` |
-| **GitOps** | Argo CD app-of-apps for the platform substrate | `deploy/gitops/` |
-
-Everything bex *consumes* is Go/k8s-native; the only first-party code is the Go
-control plane. See [`docs/go-and-gitops.md`](docs/go-and-gitops.md) for the direction
-(why Go, and why GitOps the platform but not user deploys).
+| `kubernetes` | a **Deployment** (pods on cluster machines) | the elastic, multi-machine path (CAPD/Hetzner) |
+| `opensandbox` | an OpenSandbox sandbox (host Docker) | real `pause`/`resume` snapshots; single host |
 
 ## The `Service` resource
 
 ```yaml
 apiVersion: app.bex.co/v1alpha1
 kind: Service
-metadata: { name: hello-go }
+metadata: { name: whoami }
 spec:
-  repo: "https://github.com/acme/hello-go"   # or a local path
-  branch: main
-  builder: auto            # auto | buildpack | dockerfile
-  port: 3000
-  healthCheckPath: /
-  autoDeploy: true
+  image: traefik/whoami     # prebuilt image; OR build from git with `repo:` + `branch:`
+  port: 80
+  replicas: 2               # pods bin-pack across machines
 ```
 
-The controller builds the repo, runs it as a revision on OpenSandbox, and records
-`status.{phase,url,image,sandboxID,activeRevision}`. `kubectl get services.app.bex.co`
-shows phase / revision / url.
+`kubectl get services.app.bex.co` shows phase / revision / url.
 
-## Run it (local, OrbStack)
+## Quickstart: local CAPD mock (machines = Docker containers)
 
-Prereqs: Docker (OrbStack), Go ≥ 1.22, `git`, `pack` (`brew install buildpacks/tap/pack`),
-`kubectl`, and OrbStack Kubernetes enabled (`orb start k8s`).
+Prereqs: Docker (OrbStack), Go ≥ 1.22, `kubectl`, `kind`, `clusterctl`.
 
 ```bash
-# 1. bring up the substrate (Zot registry + OpenSandbox server + the Service CRD)
-bash scripts/up.sh
+# 1. stand up the mock Hetzner substrate: kind mgmt cluster + Cluster API + CAPD
+#    + a workload cluster whose nodes are Docker containers (+ Calico CNI).
+bash scripts/mock-cluster.sh            # writes infra/local/bex.kubeconfig
 
-# 2. run the control plane (Go operator)
-cd control-plane && make run        # uses ~/.kube/config (orbstack)
+# 2. run bex against the workload cluster (kubernetes runtime)
+export KUBECONFIG=$PWD/infra/local/bex.kubeconfig
+( cd control-plane && make install )
+( cd control-plane && BEX_RUNTIME=kubernetes make run ) &
 
-# 3. deploy a service from the Go sample
-bash scripts/deploy-sample.sh       # creates a local repo + applies a Service CR
-kubectl get services.app.bex.co -w  # watch Building -> Running
+# 3. deploy a Service — pods land on the CAPD machines
+kubectl apply -f examples/whoami-service.yaml
+kubectl get pods -l app.bex.co/service=whoami -o wide   # see them on bex-md-0-* nodes
+
+# 4. ★ add a machine, then scale the Service onto it
+bash scripts/mock-cluster.sh scale 2    # worker pool 1 -> 2 (a new container node joins)
+kubectl patch service.app.bex.co whoami --type merge -p '{"spec":{"replicas":6}}'
+kubectl get pods -l app.bex.co/service=whoami -o wide   # pods now spread across both machines
 ```
 
-`status.url` is the per-sandbox endpoint; `curl` it to get `OK`.
+## Deploy to Hetzner (same bex, different provider)
 
-### Full substrate (k8s + vcluster)
-
-OpenSandbox can schedule revisions as **pods in a per-tenant vcluster** instead of
-Docker containers — point the controller at the k8s-runtime OpenSandbox server
-(`BEX_OPENSANDBOX_URL=http://127.0.0.1:8078`). Setup is in
-[`deploy/gitops/README.md`](deploy/gitops/README.md) and `scripts/start-opensandbox-k8s.sh`.
-
-### GitOps (platform substrate)
-
-`deploy/gitops/` is an Argo CD app-of-apps for the assembled OSS (Zot,
-opensandbox-controller, …). Argo CD is installed in the `orbstack` cluster; manifests
-validate. Push to a remote and `kubectl apply -f deploy/gitops/bootstrap/app-of-apps.yaml`.
-The platform is GitOps-managed; **per-deploy user workloads are not** — those are bex's
-runtime job.
+Only the infrastructure overlay changes — `infra/clusterapi/overlays/local-capd` →
+`…/hetzner-caph` (a real CAPH manifest is committed there). The bex control plane and
+the `Service`/Deployment are byte-for-byte identical. See
+[`infra/README.md`](infra/README.md) and the overlay README.
 
 ## Layout
 
 ```
-control-plane/            Go operator (kubebuilder)
-  api/v1alpha1/           Service CRD types
-  internal/build/         build plane
-  internal/runtime/       OpenSandbox client
-  internal/controller/    Service reconcile (build -> deploy -> status)
-  cmd/main.go             manager entrypoint
-examples/hello-go/        sample user app (Go + Dockerfile)
-deploy/opensandbox/       OpenSandbox server configs (docker + k8s runtimes)
-deploy/gitops/            Argo CD app-of-apps for the platform
-docs/go-and-gitops.md     direction: Go + GitOps decision
-scripts/                  up.sh, deploy-sample.sh, start-opensandbox*.sh
+control-plane/   Go operator (kubebuilder)
+  api/v1alpha1/   Service CRD          internal/build/    build plane (CNB/Dockerfile → Zot)
+  cmd/            manager entrypoint   internal/runtime/   OpenSandbox client
+  config/         CRD/RBAC kustomize   internal/controller/ reconcile: kubernetes + opensandbox runtimes
+infra/           bex-infra: terraform/ · clusterapi/{base,overlays/{local-capd,hetzner-caph}} · local/
+deploy/          gitops/{bootstrap,base,overlays/{local,staging,prod},charts} · opensandbox/ server configs
+examples/        whoami-service.yaml (prebuilt), hello-go/ (build-from-git sample)
+docs/            architecture.md · go-and-gitops.md
+scripts/         mock-cluster.sh · up.sh · deploy-sample.sh · start-opensandbox*.sh
 ```
 
-## Status — ported vs. TODO
+## Status
 
-Done in Go: build (Dockerfile/CNB→Zot), deploy on OpenSandbox, status/lifecycle phase,
-finalizer teardown. Verified end-to-end.
+Working & verified: the **Go control plane** (Service CRD + reconcile, finalizer
+teardown); the **kubernetes runtime** (Service → Deployment → pods on machines); the
+**local CAPD mock** with **add/remove machine** and pods bin-packing onto added
+machines; the **opensandbox runtime** (build CNB/Dockerfile → Zot → sandbox, real
+pause/resume); the **Hetzner CAPH overlay** (manifest committed, not applied — no account).
 
-Not yet ported from the original MVP (tracked): the **edge proxy + stable `*-id` URL +
-wake-on-request activator**, the **HMAC git webhook** (auto-deploy on push), and
-**idle → hibernate** (OpenSandbox `pause`/`resume`; works on the Docker runtime, blocked
-on OrbStack's cri-dockerd k8s — see `docs/go-and-gitops.md`). Builds run via host
-`pack`/`docker` (an in-cluster BuildKit/kpack Job is the productionization).
+Tracked next: the **edge proxy + stable URL + wake activator** and **HMAC webhook**
+(not yet ported); **Cluster Autoscaler** wiring so add/remove-machine is reactive (not
+manual); in-cluster builds (BuildKit/kpack Job) so build-from-git images are pullable
+by cluster nodes. See [`docs/architecture.md`](docs/architecture.md).
