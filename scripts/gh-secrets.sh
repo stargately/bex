@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Push bex CI secrets from .env into THIS repo's GitHub Actions secrets.
+#   1. cp .env.template .env     2. fill .env (gitignored)     3. bash scripts/gh-secrets.sh
+# Requires the gh CLI, authed (`gh auth login`). Repo is inferred from the origin remote.
+# Secrets go in via stdin/file — never as command-line args (which would leak in ps).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+[ -f .env ] || { echo "ERROR: .env not found — run: cp .env.template .env  (then fill it)"; exit 1; }
+command -v gh >/dev/null || { echo "ERROR: gh CLI not found — brew install gh && gh auth login"; exit 1; }
+
+set -a; . ./.env; set +a
+
+set_scalar() {
+  local name="$1" val="${!1:-}"
+  [ -n "$val" ] || { echo "skip  $name (empty in .env)"; return; }
+  printf '%s' "$val" | gh secret set "$name"
+  echo "set   $name"
+}
+set_file() {
+  local name="$1" path="$2"
+  [ -f "$path" ] || { echo "ERROR: $name file not found: $path"; exit 1; }
+  gh secret set "$name" < "$path"
+  echo "set   $name  (from $path)"
+}
+
+for s in HCLOUD_TOKEN TF_STATE_BUCKET TF_STATE_ENDPOINT TF_STATE_REGION TF_STATE_ACCESS_KEY TF_STATE_SECRET_KEY; do
+  set_scalar "$s"
+done
+set_file BEX_SSH_PUBLIC_KEY  "${BEX_SSH_PUBLIC_KEY_FILE:?set BEX_SSH_PUBLIC_KEY_FILE in .env}"
+set_file BEX_SSH_PRIVATE_KEY "${BEX_SSH_PRIVATE_KEY_FILE:?set BEX_SSH_PRIVATE_KEY_FILE in .env}"
+
+echo "done. verify with: gh secret list"
