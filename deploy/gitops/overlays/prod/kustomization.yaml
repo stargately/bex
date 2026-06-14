@@ -1,0 +1,7 @@
+# Prod overlay (Hetzner CAPH). References the shared base; prod-only patches go here
+# as they materialize (e.g. real-TLS Zot, higher replicas). Applied via the
+# ../../bootstrap/prod.yaml app-of-apps entrypoint.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base

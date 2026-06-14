@@ -1,10 +1,10 @@
-# Per-env app-of-apps entrypoint (local). Apply once after Argo CD is installed:
-#   kubectl apply -f deploy/gitops/bootstrap/local.yaml
-# It points Argo at the local overlay, which renders the platform Applications.
+# Per-env app-of-apps entrypoint (prod). Applied once by deploy.yml after Argo CD is
+# installed on the app cluster; Argo then reconciles the prod overlay = the whole
+# platform (zot, opensandbox-controller, bex operator, …) continuously from git.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: bex-platform-local
+  name: bex-platform-prod
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -13,7 +13,7 @@ spec:
   source:
     repoURL: https://github.com/stargately/bex
     targetRevision: main
-    path: deploy/gitops/overlays/local
+    path: deploy/gitops/overlays/prod
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd

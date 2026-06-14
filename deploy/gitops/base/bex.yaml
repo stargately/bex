@@ -1,18 +1,35 @@
-# bex control plane (our Go gateway + controllers + CRDs).
-# PLACEHOLDER — fill in once the gateway is rewritten in Go and containerized:
-#   - a Deployment for the gateway/activator
-#   - our CRDs (App, etc.) + the deploy-from-git + idle/hibernate controllers
-#   - RBAC, and (when scheduling into vclusters) the vcluster kubeconfig wiring
-# Until then the gateway runs from source (scripts/dev.sh). See docs/go-and-gitops.md §2.
+# The bex control plane: the kubebuilder operator (App CRD + reconcilers).
+# Argo deploys it straight from operator/config/default (kustomize) into bex-system,
+# overriding the placeholder `controller` image with the one CI pushes to GHCR.
 #
-# apiVersion: argoproj.io/v1alpha1
-# kind: Application
-# metadata: { name: bex-gateway, namespace: argocd }
-# spec:
-#   project: default
-#   source:
-#     repoURL: https://github.com/blockeden/bex
-#     targetRevision: main
-#     path: deploy/gitops/charts/bex-gateway   # a chart we author
-#   destination: { server: https://kubernetes.default.svc, namespace: bex-system }
-#   syncPolicy: { automated: { prune: true, selfHeal: true }, syncOptions: [CreateNamespace=true] }
+# NOTE: the tag is mutable (:latest) so the FIRST deploy works; Argo syncs git, not
+# image digests, so a new :latest push won't auto-roll. Harden with Argo Image
+# Updater or have CI commit an immutable :<sha> tag here.
+# NOTE: if the GHCR package is private, add an imagePullSecret in bex-system (or make
+# the package public) so app-cluster nodes can pull it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bex-operator
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/stargately/bex
+    targetRevision: main
+    path: operator/config/default
+    kustomize:
+      images:
+        - controller=ghcr.io/stargately/bex-operator:latest
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bex-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true # the App CRD is large — avoid last-applied annotation limits
