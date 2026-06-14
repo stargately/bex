@@ -1,0 +1,71 @@
+name: infra (terraform)
+
+# The bex infra-cluster base as IDEMPOTENT IaC — not a one-shot. PRs get a plan,
+# merges apply, a daily schedule does drift detection. Runs in CI (an ephemeral
+# runner), NEVER on a laptop. Required repo secrets:
+#   HCLOUD_TOKEN          Hetzner Cloud API token
+#   BEX_SSH_PUBLIC_KEY    public key uploaded as the `bex` hcloud key
+#   TF_STATE_BUCKET       Hetzner Object Storage bucket for remote state (create once, out-of-band)
+#   TF_STATE_ENDPOINT     e.g. https://fsn1.your-objectstorage.com
+#   TF_STATE_REGION       e.g. fsn1
+#   TF_STATE_ACCESS_KEY / TF_STATE_SECRET_KEY   Object Storage S3 credentials
+
+on:
+  pull_request:
+    paths: ["infra/terraform/**", ".github/workflows/infra.yml"]
+  push:
+    branches: [main]
+    paths: ["infra/terraform/**", ".github/workflows/infra.yml"]
+  schedule:
+    - cron: "17 6 * * *" # daily drift detection (plan only)
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+  TF_VAR_ssh_public_key: ${{ secrets.BEX_SSH_PUBLIC_KEY }}
+
+defaults:
+  run:
+    working-directory: infra/terraform
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: fmt
+        run: terraform fmt -check -recursive
+
+      - name: init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=infra/terraform.tfstate" \
+            -backend-config="region=${{ secrets.TF_STATE_REGION }}" \
+            -backend-config="endpoints={s3=\"${{ secrets.TF_STATE_ENDPOINT }}\"}" \
+            -backend-config="access_key=${{ secrets.TF_STATE_ACCESS_KEY }}" \
+            -backend-config="secret_key=${{ secrets.TF_STATE_SECRET_KEY }}"
+
+      - name: validate
+        run: terraform validate
+
+      # PRs, schedule (drift), manual: plan only — never mutate from a PR.
+      - name: plan
+        if: github.event_name != 'push'
+        run: terraform plan -no-color
+
+      # Merge to main: converge. Idempotent — a no-op when nothing changed.
+      - name: apply
+        if: github.event_name == 'push'
+        run: terraform apply -auto-approve -no-color

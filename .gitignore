@@ -12,3 +12,7 @@ deploy/opensandbox/sandbox.example.toml
 
 # CAPD workload cluster kubeconfig (credential)
 infra/local/*.kubeconfig
+
+projects-to-deploy
+.tmp
+.env

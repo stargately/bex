@@ -1,0 +1,64 @@
+variable "hcloud_token" {
+  description = "Hetzner Cloud API token. Pass via TF_VAR_hcloud_token (a CI secret) — never commit it."
+  type        = string
+  sensitive   = true
+}
+
+variable "ssh_public_key" {
+  description = "SSH public key material (e.g. 'ssh-ed25519 AAAA...'). Uploaded as `ssh_key_name`; used for the infra node AND by CAPH for app-cluster nodes (single source of truth)."
+  type        = string
+}
+
+variable "ssh_key_name" {
+  description = "Name of the hcloud SSH key. MUST match sshKeys.hcloud.name in the CAPH overlay (infra/clusterapi/overlays/hetzner-caph)."
+  type        = string
+  default     = "bex"
+}
+
+variable "location" {
+  description = "Hetzner location for the infra cluster (fsn1, nbg1, hel1, ash, hil, sin)."
+  type        = string
+  default     = "fsn1"
+}
+
+variable "network_zone" {
+  description = "Hetzner network zone matching the location (fsn1/nbg1/hel1 => eu-central; ash => us-east; hil => us-west; sin => ap-southeast)."
+  type        = string
+  default     = "eu-central"
+}
+
+variable "infra_server_type" {
+  description = "Server type for the infra (management) cluster node. Small is fine — it only runs CAPI controllers + cert-manager."
+  type        = string
+  default     = "cpx21"
+}
+
+variable "image" {
+  description = "OS image for the infra node."
+  type        = string
+  default     = "ubuntu-24.04"
+}
+
+variable "k3s_channel" {
+  description = "k3s release channel (or pinned version) for the single-node management cluster."
+  type        = string
+  default     = "stable"
+}
+
+variable "network_cidr" {
+  description = "Private network CIDR shared by the infra cluster and (later) the app-cluster nodes."
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "subnet_cidr" {
+  description = "Subnet CIDR within the private network."
+  type        = string
+  default     = "10.0.1.0/24"
+}
+
+variable "allowed_ssh_cidrs" {
+  description = "CIDRs allowed to reach SSH (22) and the k3s API (6443) on the infra node. Lock to your CI egress + admin IPs in prod — the default is wide open."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}

@@ -175,3 +175,33 @@ Tracked next: the **edge proxy + stable URL + wake activator** and **HMAC webhoo
 (not yet ported); **Cluster Autoscaler** wiring so add/remove-machine is reactive (not
 manual); in-cluster builds (BuildKit/kpack Job) so build-from-git images are pullable
 by cluster nodes. See [`docs/architecture.md`](docs/architecture.md).
+
+
+```
+┌─ INFRA CLUSTER ─────────────────────────────────────────────────┐
+│ bex-mgmt-control-plane      ▸ control-plane 节点                 │
+│                               (单节点集群,所以它既是 master,    │
+│                                也跑下面这些 CAPI pod)            │
+│   └ pod:  capi-controller   capd-controller                     │
+│           kubeadm-bootstrap  kubeadm-control-plane               │
+│           cert-manager ×3                                        │
+└──────────────────────────────────────────────────────────────────┘
+
+┌─ APP CLUSTER ───────────────────────────────────────────────────┐
+│ bex-f9zs5-4xdjn             ▸ control-plane 节点                 │
+│   └ pod:  etcd · apiserver · scheduler · controller-manager     │
+│           ✦ bex operator (bex-controller-manager) ✦             │
+│           calico · coredns · kube-proxy                          │
+│                                                                  │
+│ bex-md-0-bvbsk-...          ▸ worker 节点                        │
+│   └ pod:  beancount-cms ×2   ← 你的应用                         │
+│           calico · kube-proxy                                    │
+│                                                                  │
+│ bex-lb                      ▸ 不是 k8s 节点(haproxy LB 机器)    │
+│                               把外部请求转给上面的 apiserver     │
+└──────────────────────────────────────────────────────────────────┘
+
+┌─ REGISTRY ──────────────────────────────────────────────────────┐
+│ bex-zot                     ▸ 不是 k8s 节点(独立 registry 容器) │
+└──────────────────────────────────────────────────────────────────┘
+```
