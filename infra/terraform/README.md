@@ -45,8 +45,9 @@ runner itself. Everything above the first k3s is reconciled (CAPH, Argo, bex).
 
 ## Phase 2 — install CAPH and build the app cluster (next, also CI)
 
-After this module makes the k3s infra cluster, a follow-on job (TODO:
-`.github/workflows/app-cluster.yml`) runs against it:
+After this module makes the k3s infra cluster,
+[`.github/workflows/app-cluster.yml`](../../.github/workflows/app-cluster.yml)
+runs against it:
 
 ```
 clusterctl init --infrastructure hetzner            # installs CAPH into the infra cluster
