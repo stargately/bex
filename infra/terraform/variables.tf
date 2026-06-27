@@ -28,9 +28,9 @@ variable "network_zone" {
 }
 
 variable "infra_server_type" {
-  description = "Server type for the infra (management) cluster node. Small is fine — it only runs CAPI controllers + cert-manager."
+  description = "Server type for the infra (management) cluster node. Intel cx line — 3.5x cheaper than cpx (AMD) for identical specs in fsn1. cx23 (4GB) also works; cx33 gives headroom for cert-manager + CAPI/CAPH controllers."
   type        = string
-  default     = "cpx21"
+  default     = "cx33"
 }
 
 variable "image" {
