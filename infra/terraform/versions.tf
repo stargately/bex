@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.10" # use_lockfile (S3-native state locking) needs 1.10+
 
   required_providers {
     hcloud = {
@@ -24,6 +24,7 @@ terraform {
     skip_metadata_api_check     = true
     skip_region_validation      = true
     skip_s3_checksum            = true
+    use_lockfile                = true # S3-native lock (a .tflock object); no DynamoDB needed
   }
 }
 

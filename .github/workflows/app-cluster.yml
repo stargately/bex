@@ -44,7 +44,7 @@ jobs:
       # --- discover the infra cluster from terraform state ---
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.9.8"
+          terraform_version: "1.10.5"
           terraform_wrapper: false
       - name: terraform init (read state only)
         working-directory: infra/terraform

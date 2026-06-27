@@ -58,7 +58,7 @@ jobs:
       # --- 2. discover the app cluster kubeconfig (same path as app-cluster.yml) ---
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.9.8"
+          terraform_version: "1.10.5"
           terraform_wrapper: false
       - name: terraform init (read state only)
         working-directory: infra/terraform
