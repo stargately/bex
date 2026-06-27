@@ -173,7 +173,7 @@ metadata:
   namespace: default
 spec:
   clusterName: bex
-  replicas: 3
+  replicas: 0 # no dedicated workers at current scale; apps run on the (untainted) control-plane. Scale up later.
   selector:
     matchLabels: null
   template:
@@ -396,6 +396,7 @@ spec:
       permissions: "0744"
     initConfiguration:
       nodeRegistration:
+        taints: [] # single-node cluster: remove the control-plane NoSchedule taint so pods run here
         kubeletExtraArgs:
           anonymous-auth: "false"
           authentication-token-webhook: "true"
@@ -469,7 +470,7 @@ spec:
       apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
       kind: HCloudMachineTemplate
       name: bex-control-plane
-  replicas: 3
+  replicas: 1 # single-node app cluster (no HA) at current scale; bump for etcd quorum (3) later
   version: v1.31.0
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
