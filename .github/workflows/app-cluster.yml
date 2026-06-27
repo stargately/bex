@@ -32,7 +32,7 @@ env:
   HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
   CLUSTER_NAME: bex
   POD_CIDR: 10.244.0.0/16 # must match the overlay's clusterNetwork.pods.cidrBlocks
-  CAPH_VERSION: v1.0.5 # matches how cluster.yaml was generated
+  CAPH_VERSION: v1.1.7 # v1.0.x webhook had a stale server-type enum (rejected cx33); v1.1.x dropped it
   CLUSTERCTL_VERSION: v1.13.2
 
 jobs:
@@ -85,9 +85,23 @@ jobs:
           sudo install -m755 /tmp/clusterctl /usr/local/bin/clusterctl
           clusterctl version
 
-      # --- install CAPH into the infra cluster (idempotent) ---
-      - name: clusterctl init (CAPH)
-        run: clusterctl init --infrastructure "hetzner:${CAPH_VERSION}" || echo "providers already installed — continuing"
+      # --- install/upgrade CAPH on the infra cluster (idempotent across version bumps) ---
+      # clusterctl init is one-shot; to change provider version we delete just the
+      # infrastructure provider (keeps CAPI core + CRDs + any Cluster objects) and
+      # re-init it. The canonical version lives on the clusterctl Provider object.
+      - name: ensure CAPH at desired version
+        run: |
+          cur=$(kubectl get providers -A -o jsonpath='{.items[?(@.metadata.name=="infrastructure-hetzner")].version}' 2>/dev/null || true)
+          if [ -z "$cur" ]; then
+            echo "CAPH not installed — init ${CAPH_VERSION}"
+            clusterctl init --infrastructure "hetzner:${CAPH_VERSION}"
+          elif [ "$cur" != "${CAPH_VERSION}" ]; then
+            echo "CAPH ${cur} -> ${CAPH_VERSION} (replace infrastructure provider)"
+            clusterctl delete --infrastructure hetzner
+            clusterctl init --infrastructure "hetzner:${CAPH_VERSION}"
+          else
+            echo "CAPH already at ${CAPH_VERSION}"
+          fi
       - name: wait for CAPI/CAPH controllers
         run: |
           for ns in cert-manager capi-system caph-system; do
