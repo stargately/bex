@@ -118,9 +118,19 @@ jobs:
       # --- apply the overlay -> CAPH provisions the app cluster ---
       - name: apply CAPH overlay
         run: kubectl apply -f infra/clusterapi/overlays/hetzner-caph/cluster.yaml
+      # NOTE: `kubectl wait --for=condition=ControlPlaneInitialized` is unreliable on
+      # CAPI v1beta2 clusters (the condition reads True via jsonpath but `wait`'s
+      # matcher times out). Poll the jsonpath directly instead — bulletproof.
       - name: wait for app cluster control plane
         run: |
-          kubectl wait --for=condition=ControlPlaneInitialized "cluster/${CLUSTER_NAME}" --timeout=1200s
+          for i in $(seq 1 120); do
+            s=$(kubectl get cluster "${CLUSTER_NAME}" -o jsonpath='{.status.conditions[?(@.type=="ControlPlaneInitialized")].status}' 2>/dev/null || true)
+            [ "$s" = "True" ] && break
+            echo "  [$i/120] ControlPlaneInitialized=${s:-<none>}; retrying in 10s"; sleep 10
+          done
+          if [ "$s" != "True" ]; then
+            echo "control plane not initialized in time"; kubectl get cluster,kcp,machines -A -o wide; exit 1
+          fi
           kubectl get cluster,machines -A -o wide
 
       # --- pull the app cluster kubeconfig; switch default context to it ---
