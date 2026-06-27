@@ -105,6 +105,22 @@ jobs:
           kubectl -n argocd rollout status deploy/argocd-repo-server --timeout=300s
           kubectl -n argocd rollout status deploy/argocd-server --timeout=300s
 
+      # --- 3b. give Argo a read-only SSH deploy key for the private repo ---
+      # The app-of-apps and the bex-operator child app source from this private
+      # repo over SSH; without this credential Argo can't clone it. github.com host
+      # keys ship in argocd-ssh-known-hosts-cm (part of the install), so no extra
+      # known_hosts config is needed.
+      - name: configure Argo repo credentials
+        run: |
+          printf '%s\n' "${{ secrets.ARGOCD_REPO_SSH_KEY }}" > /tmp/argo_deploy_key
+          kubectl -n argocd create secret generic bex-repo \
+            --from-literal=type=git \
+            --from-literal=url=git@github.com:stargately/bex.git \
+            --from-file=sshPrivateKey=/tmp/argo_deploy_key \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n argocd label secret bex-repo argocd.argoproj.io/secret-type=repository --overwrite
+          rm -f /tmp/argo_deploy_key
+
       # --- 4. point Argo at the repo; it reconciles the whole platform ---
       - name: apply prod app-of-apps
         run: kubectl apply -f deploy/gitops/bootstrap/prod.yaml

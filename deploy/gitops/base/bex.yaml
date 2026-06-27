@@ -17,7 +17,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/stargately/bex
+    repoURL: git@github.com:stargately/bex.git
     targetRevision: main
     path: operator/config/default
     kustomize:
