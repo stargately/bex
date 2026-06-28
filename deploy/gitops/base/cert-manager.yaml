@@ -1,0 +1,28 @@
+# cert-manager — automated TLS for the edge. Issues + renews Let's Encrypt certs
+# (stored durably as Secrets) for the Ingresses the bex operator creates. The two
+# ClusterIssuers (staging + prod) live in cert-manager-issuers.yaml (sync-wave 2,
+# after these CRDs exist).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: "v1.20.3"          # pin exact for reproducibility
+    helm:
+      values: |
+        crds:
+          enabled: true                # install the cert-manager CRDs
+          keep: true                   # don't GC CRDs (+ issued certs) on uninstall
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true]

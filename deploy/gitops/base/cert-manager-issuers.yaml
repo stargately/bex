@@ -1,0 +1,21 @@
+# The Let's Encrypt ClusterIssuers, vendored in this repo (Argo reads via the SSH
+# deploy key, like bex.yaml). sync-wave 2 so cert-manager (its CRDs) from wave 1 is
+# applied first; SkipDryRunOnMissingResource on each issuer covers any residual race.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager-issuers
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:stargately/bex.git
+    targetRevision: main
+    path: deploy/gitops/charts/cert-manager-issuers
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }

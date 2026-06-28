@@ -1,0 +1,40 @@
+# Let's Encrypt ClusterIssuers (cluster-wide). Build/validate on staging (no real
+# rate limits, browser-untrusted certs), then flip the operator's BEX_CLUSTER_ISSUER
+# to letsencrypt-prod for a trusted cert. HTTP-01 solver routes the ACME challenge
+# through Traefik (ingressClassName: traefik).
+#
+# SkipDryRunOnMissingResource lets Argo apply these even if the cert-manager CRDs are
+# momentarily absent during the first sync (belt-and-suspenders with sync-wave 2).
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: dorathynoda@gmail.com
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: traefik
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: dorathynoda@gmail.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: traefik

@@ -69,6 +69,19 @@ type AppSpec struct {
 	// IdleTTLSeconds before the service hibernates ("sleep = free"). 0 = controller default.
 	// +optional
 	IdleTTLSeconds int32 `json:"idleTTLSeconds,omitempty"`
+
+	// Host is the external FQDN to expose this App at (e.g. "beancount.1.2.3.4.sslip.io",
+	// or a tenant's custom domain). On the kubernetes runtime the operator creates an
+	// Ingress (+ TLS via cert-manager) routing this host to the App's Service. Empty =>
+	// in-cluster only (ClusterIP).
+	// +optional
+	Host string `json:"host,omitempty"`
+
+	// Expose, when true and Host is empty, makes the operator compute the host as
+	// "<name>.<BEX_BASE_DOMAIN>" (requires the controller's BEX_BASE_DOMAIN env). Use
+	// once a wildcard domain exists; with sslip.io set Host explicitly.
+	// +optional
+	Expose bool `json:"expose,omitempty"`
 }
 
 // AppPhase mirrors the lifecycle state machine (211.09 §Agent Lifecycle).

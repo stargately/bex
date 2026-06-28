@@ -68,6 +68,13 @@ spec:
         env:
           - name: BEX_RUNTIME
             value: kubernetes
+          # cert-manager ClusterIssuer for App Ingresses. Start on staging; flip to
+          # letsencrypt-prod once the chain verifies (changing this re-rolls the pod
+          # -> re-pulls :latest -> re-reconciles Apps with the new issuer).
+          - name: BEX_CLUSTER_ISSUER
+            value: letsencrypt-staging
+          # - name: BEX_BASE_DOMAIN      # set once a wildcard domain (e.g. bex.co) exists
+          #   value: bex.co
         ports:
         - containerPort: 8081
           name: health

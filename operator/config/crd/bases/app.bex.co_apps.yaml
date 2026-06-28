@@ -70,10 +70,23 @@ spec:
                 - buildpack
                 - dockerfile
                 type: string
+              expose:
+                description: |-
+                  Expose, when true and Host is empty, makes the operator compute the host as
+                  "<name>.<BEX_BASE_DOMAIN>" (requires the controller's BEX_BASE_DOMAIN env). Use
+                  once a wildcard domain exists; with sslip.io set Host explicitly.
+                type: boolean
               healthCheckPath:
                 default: /
                 description: HealthCheckPath polled for 2xx before traffic is shifted
                   to a new revision.
+                type: string
+              host:
+                description: |-
+                  Host is the external FQDN to expose this App at (e.g. "beancount.1.2.3.4.sslip.io",
+                  or a tenant's custom domain). On the kubernetes runtime the operator creates an
+                  Ingress (+ TLS via cert-manager) routing this host to the App's Service. Empty =>
+                  in-cluster only (ClusterIP).
                 type: string
               idleTTLSeconds:
                 description: IdleTTLSeconds before the service hibernates ("sleep

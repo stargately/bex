@@ -8,3 +8,6 @@ resources:
   - bex.yaml                     # the bex control plane (operator + gateway)
   - cluster-api.yaml             # Cluster API + provider controllers (the node-provisioning engine)
   - autoscaler.yaml              # Cluster Autoscaler (reacts to pending pods -> add/remove machines)
+  - traefik.yaml                 # edge / ingress controller (Hetzner LB front door)
+  - cert-manager.yaml            # automated Let's Encrypt TLS
+  - cert-manager-issuers.yaml    # letsencrypt-staging + -prod ClusterIssuers (after cert-manager)

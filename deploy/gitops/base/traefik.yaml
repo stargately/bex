@@ -1,0 +1,51 @@
+# Traefik — the cluster edge / ingress controller. Chosen over ingress-nginx because
+# the roadmap is multi-tenant BYOD (tenants add custom domains dynamically): Traefik
+# routes new hosts WITHOUT a config reload, where nginx does a full reload per change.
+# TLS is handled by cert-manager (see cert-manager.yaml + cert-manager-issuers.yaml),
+# NOT Traefik's built-in ACME — so the operator just emits standard Ingress objects
+# (ingressClassName: traefik) and the controller stays swappable.
+#
+# Fronted by a Hetzner LoadBalancer: service.spec.type=LoadBalancer + the Hetzner CCM
+# (already installed) provisions the LB. use-private-ip=false is REQUIRED here — the
+# app cluster has no private network (hcloudNetwork.enabled=false), so the LB targets
+# node public IPs. location is mandatory (CCM has no region default).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traefik
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://traefik.github.io/charts
+    chart: traefik
+    targetRevision: "41.0.0"           # Traefik v3; pin exact for reproducibility
+    helm:
+      values: |
+        deployment:
+          replicas: 1                  # single app node today; bump with worker pool
+        ingressClass:
+          enabled: true
+          isDefaultClass: true
+          name: traefik
+        providers:
+          kubernetesIngress:
+            enabled: true              # watch standard networking.k8s.io/Ingress
+        service:
+          annotations:
+            load-balancer.hetzner.cloud/location: "fsn1"
+            load-balancer.hetzner.cloud/use-private-ip: "false"  # no private network -> target public IPs
+            load-balancer.hetzner.cloud/name: "bex-ingress"
+          spec:
+            type: LoadBalancer
+            externalTrafficPolicy: Local  # single node always hosts the endpoint; preserves client IP
+        # entrypoints web(:80) + websecure(:443) are exposed by default with NO forced
+        # web->websecure redirect, so cert-manager HTTP-01 challenges on :80 succeed.
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: traefik
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true]

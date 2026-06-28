@@ -24,6 +24,8 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,10 +57,12 @@ const (
 type AppReconciler struct {
 	client.Client
 	Scheme     *runtime.Scheme
-	Mode       string                  // ModeOpenSandbox | ModeKubernetes
-	Registry   string                  // e.g. 127.0.0.1:5050
-	CNBBuilder string                  // e.g. paketobuildpacks/builder-jammy-base
-	Runtime    *bexruntime.OpenSandbox // OpenSandbox client (ModeOpenSandbox)
+	Mode          string                  // ModeOpenSandbox | ModeKubernetes
+	Registry      string                  // e.g. 127.0.0.1:5050
+	CNBBuilder    string                  // e.g. paketobuildpacks/builder-jammy-base
+	Runtime       *bexruntime.OpenSandbox // OpenSandbox client (ModeOpenSandbox)
+	BaseDomain    string                  // optional: "<name>.<BaseDomain>" when Expose && Host=="" (e.g. bex.co)
+	ClusterIssuer string                  // cert-manager ClusterIssuer for App Ingresses (letsencrypt-staging|-prod)
 }
 
 // +kubebuilder:rbac:groups=app.bex.co,resources=apps,verbs=get;list;watch;create;update;patch;delete
@@ -66,6 +70,7 @@ type AppReconciler struct {
 // +kubebuilder:rbac:groups=app.bex.co,resources=apps/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 
 func (r *AppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var app appv1alpha1.App
@@ -167,6 +172,59 @@ func (r *AppReconciler) reconcileKubernetes(ctx context.Context, app *appv1alpha
 		return r.fail(ctx, app, "ServiceFailed", err)
 	}
 
+	// Optional external exposure: when Host (or Expose+BaseDomain) is set, front the
+	// Service with an Ingress (TLS issued by cert-manager). Empty => in-cluster only,
+	// exactly as before. The operator emits a standard networking.k8s.io Ingress, so
+	// the ingress controller (traefik today) stays swappable.
+	host := app.Spec.Host
+	if host == "" && app.Spec.Expose && r.BaseDomain != "" {
+		host = fmt.Sprintf("%s.%s", app.Name, r.BaseDomain)
+	}
+	if host != "" {
+		ingressClass := "traefik"
+		pathType := networkingv1.PathTypePrefix
+		ing := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: app.Name, Namespace: app.Namespace}}
+		if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, ing, func() error {
+			if ing.Annotations == nil {
+				ing.Annotations = map[string]string{}
+			}
+			if r.ClusterIssuer != "" {
+				ing.Annotations["cert-manager.io/cluster-issuer"] = r.ClusterIssuer
+			}
+			ing.Spec.IngressClassName = &ingressClass
+			ing.Spec.TLS = []networkingv1.IngressTLS{{
+				Hosts:      []string{host},
+				SecretName: app.Name + "-tls",
+			}}
+			ing.Spec.Rules = []networkingv1.IngressRule{{
+				Host: host,
+				IngressRuleValue: networkingv1.IngressRuleValue{
+					HTTP: &networkingv1.HTTPIngressRuleValue{
+						Paths: []networkingv1.HTTPIngressPath{{
+							Path:     "/",
+							PathType: &pathType,
+							Backend: networkingv1.IngressBackend{
+								Service: &networkingv1.IngressServiceBackend{
+									Name: app.Name,
+									Port: networkingv1.ServiceBackendPort{Number: int32(port)},
+								},
+							},
+						}},
+					},
+				},
+			}}
+			return controllerutil.SetControllerReference(app, ing, r.Scheme)
+		}); err != nil {
+			return r.fail(ctx, app, "IngressFailed", err)
+		}
+	} else {
+		// Exposure turned off (host cleared): remove any Ingress we previously created.
+		stale := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: app.Name, Namespace: app.Namespace}}
+		if err := r.Delete(ctx, stale); err != nil && !apierrors.IsNotFound(err) {
+			return r.fail(ctx, app, "IngressCleanupFailed", err)
+		}
+	}
+
 	// Readiness: requeue until the Deployment has its replicas ready.
 	_ = r.Get(ctx, client.ObjectKeyFromObject(dep), dep)
 	if dep.Status.ReadyReplicas < replicas {
@@ -178,7 +236,11 @@ func (r *AppReconciler) reconcileKubernetes(ctx context.Context, app *appv1alpha
 
 	app.Status.Phase = appv1alpha1.PhaseRunning
 	app.Status.Image = image
-	app.Status.URL = fmt.Sprintf("http://%s.%s.svc:%d", app.Name, app.Namespace, port)
+	if host != "" {
+		app.Status.URL = "https://" + host
+	} else {
+		app.Status.URL = fmt.Sprintf("http://%s.%s.svc:%d", app.Name, app.Namespace, port)
+	}
 	app.Status.ActiveRevision = fmt.Sprintf("rev-%d", app.Generation)
 	app.Status.ObservedGeneration = app.Generation
 	meta.SetStatusCondition(&app.Status.Conditions, metav1.Condition{
@@ -256,6 +318,7 @@ func (r *AppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appv1alpha1.App{}).
 		Owns(&appsv1.Deployment{}).
+		Owns(&networkingv1.Ingress{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Named("app").
 		Complete(r)
