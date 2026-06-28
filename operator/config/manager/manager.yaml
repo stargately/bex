@@ -72,7 +72,7 @@ spec:
           # letsencrypt-prod once the chain verifies (changing this re-rolls the pod
           # -> re-pulls :latest -> re-reconciles Apps with the new issuer).
           - name: BEX_CLUSTER_ISSUER
-            value: letsencrypt-staging
+            value: letsencrypt-prod
           # - name: BEX_BASE_DOMAIN      # set once a wildcard domain (e.g. bex.co) exists
           #   value: bex.co
         ports:
