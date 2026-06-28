@@ -5,10 +5,16 @@
 # NOT Traefik's built-in ACME — so the operator just emits standard Ingress objects
 # (ingressClassName: traefik) and the controller stays swappable.
 #
-# Fronted by a Hetzner LoadBalancer: service.spec.type=LoadBalancer + the Hetzner CCM
-# (already installed) provisions the LB. use-private-ip=false is REQUIRED here — the
-# app cluster has no private network (hcloudNetwork.enabled=false), so the LB targets
-# node public IPs. location is mandatory (CCM has no region default).
+# EDGE EXPOSURE — hostNetwork, not a Hetzner LoadBalancer.
+# A Hetzner Cloud LB routes to *server* targets over a PRIVATE network; this cluster
+# has none (hcloudNetwork.enabled=false), so the CCM-provisioned LB can't reach the
+# nodes (health checks stay unhealthy) even with use-private-ip=false. Rather than
+# enable the private network (a risky change to the live single control-plane node),
+# Traefik runs on hostNetwork and binds the node's public IP :80/:443 directly — which
+# is reachable (verified). NET_BIND_SERVICE lets the non-root pod bind <1024;
+# ClusterFirstWithHostNet keeps in-cluster API/DNS working in the host netns.
+# UPGRADE PATH (multi-node / stable IP): enable the Hetzner private network, then flip
+# service.type back to LoadBalancer so the CCM provisions a real LB with a stable IP.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -25,7 +31,22 @@ spec:
     helm:
       values: |
         deployment:
-          replicas: 1                  # single app node today; bump with worker pool
+          replicas: 1                  # single app node today
+          dnsPolicy: ClusterFirstWithHostNet   # reach in-cluster API/DNS under hostNetwork
+        hostNetwork: true              # bind the node's public IP directly (no Hetzner LB)
+        securityContext:
+          capabilities:
+            add: [NET_BIND_SERVICE]    # bind :80/:443 as non-root
+            drop: [ALL]
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+        ports:
+          web:
+            port: 80                   # host :80 (HTTP + ACME HTTP-01 challenge)
+          websecure:
+            port: 443                  # host :443 (HTTPS)
+        service:
+          type: ClusterIP              # no LoadBalancer: CCM LB can't reach nodes w/o a private network
         ingressClass:
           enabled: true
           isDefaultClass: true
@@ -33,16 +54,8 @@ spec:
         providers:
           kubernetesIngress:
             enabled: true              # watch standard networking.k8s.io/Ingress
-        service:
-          annotations:
-            load-balancer.hetzner.cloud/location: "fsn1"
-            load-balancer.hetzner.cloud/use-private-ip: "false"  # no private network -> target public IPs
-            load-balancer.hetzner.cloud/name: "bex-ingress"
-          spec:
-            type: LoadBalancer
-            externalTrafficPolicy: Local  # single node always hosts the endpoint; preserves client IP
-        # entrypoints web(:80) + websecure(:443) are exposed by default with NO forced
-        # web->websecure redirect, so cert-manager HTTP-01 challenges on :80 succeed.
+        # entrypoints web(:80) + websecure(:443) with NO forced web->websecure redirect,
+        # so cert-manager HTTP-01 challenges on :80 succeed.
   destination:
     server: https://kubernetes.default.svc
     namespace: traefik
