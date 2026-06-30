@@ -5,7 +5,11 @@ prebuilt image) becomes a running service, scheduled across machines that are
 **added/removed elastically** — and the whole thing runs **locally as a mock** that
 swaps to **Hetzner** by changing one provider overlay.
 
-The control plane is a **Go Kubernetes operator**. Everything else is assembled open
+Today's brain is a **Go Kubernetes operator** that reconciles `App` CRs into running
+services. The planned next layer is a **Postgres-backed control plane** — the product's
+**source of truth** (tenants / apps / domains + business logic) that projects rows into
+`App` CRs; the operator stays a thin executor. See
+[`docs/control-plane.md`](docs/control-plane.md). Everything else is assembled open
 source. Full design in [`docs/architecture.md`](docs/architecture.md).
 
 ## Panorama
@@ -57,10 +61,14 @@ source. Full design in [`docs/architecture.md`](docs/architecture.md).
     node pod→apiserver (same gap crashes calico-kube-controllers); real CNI needs no pin.
 ```
 
-> **Two "control planes" — don't conflate.** The **BEX OPERATOR** (`· bex`) is the
-> *platform* control plane — a pod that decides what to deploy. The **control-plane
-> node** (apiserver/etcd/scheduler) is the *cluster's* own master. The operator is a
-> **client** of that apiserver — it runs in-cluster, **never on your laptop**.
+> **"control plane" is overloaded — three distinct things.** (1) The **BEX OPERATOR**
+> (`· bex`) — a pod that *executes* deploys (reconciles `App` CRs → Deployment/Service/
+> Ingress); a **client** of the apiserver, runs in-cluster, never on your laptop. (2) The
+> **control-plane node** (apiserver/etcd/scheduler) — the *cluster's* own master. (3) The
+> **bex control plane** *(planned)* — a Postgres-backed service that *decides* intent
+> (tenants/apps/domains + business logic) and writes the `App` CRs the operator executes;
+> see [`docs/control-plane.md`](docs/control-plane.md). Today there is no (3): you
+> `kubectl apply` App CRs directly.
 
 - **Two clusters.** The **app cluster** runs the bex operator **and** your Apps; the
   **infra cluster** runs only Cluster API (it provisions the app cluster's machines).
@@ -75,8 +83,11 @@ source. Full design in [`docs/architecture.md`](docs/architecture.md).
 
 ## Two layers
 
-- **`bex`** (control plane, Go): build → deploy → serve, placement, the auto-allocator.
-  Node-aware, **provision-unaware** — it only reads `Node`/`Pod` and creates Deployments.
+- **`bex`** (Go): build → deploy → serve, placement, the auto-allocator. Two parts:
+  the **operator** (today — reconciles `App` CRs → Deployments; node-aware,
+  **provision-unaware**, only reads `Node`/`Pod`) and, **planned**, the **control plane**
+  — a Postgres source of truth (tenants/apps/domains + business logic) that writes the
+  `App` CRs the operator executes ([`docs/control-plane.md`](docs/control-plane.md)).
 - **`bex-infra`** (`infra/`): how clusters and machines *exist* — Cluster API + a
   provider (CAPD locally, CAPH on Hetzner), Cluster Autoscaler, Terraform.
 
@@ -171,10 +182,15 @@ teardown); the **kubernetes runtime** (App → Deployment → pods on machines);
 machines; the **opensandbox runtime** (build CNB/Dockerfile → Zot → sandbox, real
 pause/resume); the **Hetzner CAPH overlay** (manifest committed, not applied — no account).
 
-Tracked next: the **edge proxy + stable URL + wake activator** and **HMAC webhook**
-(not yet ported); **Cluster Autoscaler** wiring so add/remove-machine is reactive (not
-manual); in-cluster builds (BuildKit/kpack Job) so build-from-git images are pullable
-by cluster nodes. See [`docs/architecture.md`](docs/architecture.md).
+Tracked next: the **bex control plane** — a Postgres **source of truth** (tenants /
+apps / domains + business logic) that projects to `App` CRs, so business data is durable
+and queryable instead of living only in the app cluster's **etcd** (lost on a node
+*rebuild*; Apps are imperative, not in git) — see
+[`docs/control-plane.md`](docs/control-plane.md); the **wake activator** + **HMAC
+webhook** (not yet ported); **Cluster Autoscaler** wiring so add/remove-machine is
+reactive (not manual); in-cluster builds (BuildKit/kpack Job) so build-from-git images
+are pullable by cluster nodes. The **edge (HTTPS via `App.spec.host`)** is live — Traefik
++ cert-manager (`docs/architecture.md`). See [`docs/architecture.md`](docs/architecture.md).
 
 
 ```

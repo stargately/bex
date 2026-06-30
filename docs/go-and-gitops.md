@@ -56,6 +56,13 @@ What "mostly Go" means concretely:
   we *consume* them). "Mostly Go" = **our** code is Go; we talk to deps over their APIs/CRDs.
 - Keep the Node MVP as the executable spec/reference until the Go control plane reaches parity.
 
+**Two pieces inside "the control plane."** As bex goes multi-tenant, split it: a thin
+**operator** (CR reconciler, no DB — exists today) and a **control-plane service** backed
+by **Postgres** as the product's *source of truth* (tenants / apps / domains + business
+logic) that projects rows into `App` CRs. Business logic lives in the control plane; the
+operator stays mechanical. Postgres is the durable truth; **etcd becomes a rebuildable
+projection** of it. Full design: [`control-plane.md`](control-plane.md).
+
 This also reinforces the GitOps answer below: a Go, k8s-native control plane is itself just
 more Deployments + CRDs in the same declarative substrate.
 
@@ -95,9 +102,10 @@ own that plane at runtime.
 | --- | --- | --- |
 | Cluster addons (ingress, cert-manager, registry/Zot, monitoring) | ✅ yes | platform repo (Argo/Flux) |
 | OpenSandbox controller + CRDs (+ snapshot config) | ✅ yes | platform repo |
-| bex control plane (gateway/activator/controllers + our CRDs) | ✅ yes | platform repo |
+| bex control-plane **service** (operator/CRDs + gateway + Postgres StatefulSet) | ✅ yes | platform repo |
 | Per-tenant vcluster provisioning | ◑ bootstrap via GitOps; scale dynamically | both |
 | **User service revisions (webhook→build→deploy)** | ❌ no | **bex product runtime** |
+| **Control-plane business data** (tenants/apps/domains *inside* Postgres) | ❌ no | **bex product runtime** — Postgres is the source of truth; etcd is a rebuildable projection |
 | Cluster creation (nodes) | ❌ no (Terraform/infra) | infra repo |
 
 ## 4. Proposed GitOps shape (prepared in `deploy/gitops/`)

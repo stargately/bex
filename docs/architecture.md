@@ -8,7 +8,7 @@ hibernated ("sleep = free") and woken on request. This doc is the map.
 
 The single most important boundary:
 
-| | **bex** (control plane) | **bex-infra** (provisioning) |
+| | **bex** (control plane + operator) | **bex-infra** (provisioning) |
 | --- | --- | --- |
 | owns | placement, lifecycle, build→deploy→serve, the **auto-allocator** | clusters + machines |
 | node awareness | **reads** `Node`/`Pod` (capacity, utilization); decides placement/eviction | **creates/joins/deletes** nodes |
@@ -32,6 +32,27 @@ The APP CLUSTER belongs to *neither* layer cleanly — it's the substrate
 bex-infra provisions, and it hosts both the bex operator pod and the user Apps.
 The operator runs **in-cluster** (a `Deployment` in `bex-system`), never on a laptop;
 `make run` from source is only a dev inner-loop.
+
+### Control plane (source of truth) vs. operator (mechanism)
+
+The `bex` layer itself splits in two — keep them distinct (full design:
+[`control-plane.md`](control-plane.md)):
+
+- **operator** *(today)* — a k8s controller that reconciles `App` CRs into
+  `Deployment`/`Service`/`Ingress` (+TLS). **No database**; idempotent; mechanical.
+- **control plane** *(planned)* — a **Postgres-backed** service holding the product's
+  **source of truth** (tenants / apps / domains / plans + business logic). It projects
+  rows into `App` CRs; the operator executes them.
+
+Business/product logic belongs in the **control plane**; the operator stays a thin,
+CR-driven reconciler. The **`App` CR is the contract** between them.
+
+**Data layering.** Postgres (planned) is the **durable truth**; Kubernetes/**etcd is a
+rebuildable projection** of it — lose the cluster, re-project from Postgres. This matters
+because today business state lives *only* in the single app node's etcd (local disk, no
+HA) and Apps are imperative (not in git), so a node *rebuild* loses it. Until the control
+plane exists: `App` CRs are applied directly and etcd is the only store (snapshot it
+off-node for interim durability).
 
 ## `infra/` vs `deploy/` (both hold YAML — different jobs)
 
@@ -88,7 +109,7 @@ locally, in Docker, then swap the provider for Hetzner.
 ## Repo map
 
 ```
-operator/   Go operator (+ future gateway): api/ internal/{build,runtime,controller,allocator,gateway} cmd/
+operator/   Go operator (+ planned control plane & gateway): api/ internal/{build,runtime,controller,allocator,gateway} cmd/  ·  control plane = Postgres source of truth (docs/control-plane.md)
 infra/           bex-infra: terraform/ clusterapi/{base,overlays/{local-capd,hetzner-caph}} local/
 deploy/          GitOps: gitops/{bootstrap,base,overlays/{local,staging,prod},charts} + opensandbox/ server configs
 examples/        sample user apps (hello-go)
