@@ -1,10 +1,6 @@
 # infra/ — bex-infra: how clusters and machines come to exist
 
-`infra/` is the **provisioning** layer. It answers _"does the cluster / do the nodes
-exist?"_ — and it runs from **outside** the cluster (your laptop / CI), day-0.
-Contrast `deploy/`, which is what **Argo reconciles into an already-existing
-cluster** (day-1+). The bex Go control plane never references anything here — it
-only reads k8s `Node`/`Pod` objects (provision-unaware).
+`infra/` is the **provisioning** layer. It answers _"does the cluster / do the nodes exist?"_ — and it runs from **outside** the cluster (your laptop / CI), day-0. Contrast `deploy/`, which is what **Argo reconciles into an already-existing cluster** (day-1+). The bex Go control plane never references anything here — it only reads k8s `Node`/`Pod` objects (provision-unaware).
 
 ```
 infra/
@@ -21,13 +17,11 @@ infra/
 
 `bex` is identical in both; only the **infrastructure provider overlay** changes:
 
-|                | local (mock)                       | Hetzner (prod)                     |
-| -------------- | ---------------------------------- | ---------------------------------- |
-| provider       | **CAPD** (Docker)                  | **CAPH** (Hetzner)                 |
-| "machine"      | a Docker container node            | a Hetzner server / bare-metal      |
-| overlay        | `clusterapi/overlays/local-capd`   | `clusterapi/overlays/hetzner-caph` |
-| base substrate | kind infra cluster (`infra/local`) | `infra/terraform`                  |
+|  | local (mock) | Hetzner (prod) |
+| --- | --- | --- |
+| provider | **CAPD** (Docker) | **CAPH** (Hetzner) |
+| "machine" | a Docker container node | a Hetzner server / bare-metal |
+| overlay | `clusterapi/overlays/local-capd` | `clusterapi/overlays/hetzner-caph` |
+| base substrate | kind infra cluster (`infra/local`) | `infra/terraform` |
 
-Add/remove a machine = change `MachineDeployment.replicas` (or let Cluster
-Autoscaler do it from pending pods). The mechanism is the same; only the provider
-behind it differs.
+Add/remove a machine = change `MachineDeployment.replicas` (or let Cluster Autoscaler do it from pending pods). The mechanism is the same; only the provider behind it differs.
