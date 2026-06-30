@@ -77,10 +77,7 @@ A **tier/plan** (Free, Starter, Standard, Pro, …) is just a fixed **resource a
 
 **Node size is bounded by the largest tier offered.** A `Pro Ultra` pod (32 GB/8 CPU) needs a node ≥ that — so either the pool uses big enough machines (on Hetzner a `ccx`/`cpx` with ≥32 GB) or the offered tiers are capped to what the node catalog holds.
 
-**The one real lever is the Free tier:**
-
-- **Reserve it** — Free also gets a real `512Mi/100m` slice → simplest; it counts in Σ, i.e. a small fixed cost per free app (not literally free to host).
-- **Sleep it** (`sleep = free`: idle free apps hibernate) → sleeping pods don't occupy, so you can pack **beyond** Σ (overcommit) and Free approaches \$0. Paid tiers always reserve.
+**Free tier = sleep-when-idle (decided).** Idle free apps **hibernate** (`sleep = free`) and **wake on the next request** via the gateway **activator** (Knative-style); a sleeping pod occupies nothing, so the cluster **overcommits well beyond Σ** and Free approaches \$0. So the `Σ(running pods)` above is really `Σ(paid pods + currently-awake free pods)` — sleeping free apps don't count. **Paid tiers stay reserved** (always-on, `request=limit`). The price of this choice: a **cold-start** on wake (hold/queue the first request while the pod resumes) and an **idle-detector + activator in the request path**. This is the same `sleep = free` loop bex already runs for the OpenSandbox runtime (idle → pause, request → resume) — see [`architecture.md`](architecture.md).
 
 **Where it lives in bex:** `App.tier` (set from the plan in Postgres) → the operator translates it to the pod's `requests/limits`; the **auto-allocator** bin-packs + idle-evicts; CAPI / Cluster Autoscaler turns the aggregate into machines. _(Planned: the `tier` field on `App` and the autoscaler wiring — today pod resources are implicit and machine count is manual.)_
 
