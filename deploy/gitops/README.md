@@ -3,7 +3,7 @@
 The **platform substrate** as declarative, version-pinned state, reconciled by Argo CD.
 
 > **GitOps the platform; never GitOps the per-deploy user workloads** (those are bex's
-> product runtime — webhook → build → deploy). And cluster/node *creation* lives in
+> product runtime — webhook → build → deploy). And cluster/node _creation_ lives in
 > [`infra/`](../../infra/), not here (engine vs. desired-infra — see
 > [docs/architecture.md](../../docs/architecture.md)).
 
@@ -35,6 +35,7 @@ deploy/gitops/
 is the Argo entrypoint that points at one overlay.
 
 ## Status
+
 - ✅ opensandbox-controller chart **vendored** (`charts/opensandbox-controller`, 0.2.0);
   renders with pinned values (image `v0.2.0` + snapshot flags).
 - ✅ Argo CD installed in the cluster; Application manifests validate (`--dry-run=server`).

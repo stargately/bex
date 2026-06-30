@@ -4,18 +4,19 @@
 cluster bex --infrastructure hetzner:v1.0.5 ...`): `Cluster` + `HetznerCluster` +
 `HCloudMachineTemplate` + `KubeadmControlPlane` + **`MachineDeployment`** +
 `MachineHealthCheck`. It contains **no secrets** — `hcloudToken: hcloud` /
-`hetznerRobotPassword: robot-password` are *key references* into a `hetzner` Secret
+`hetznerRobotPassword: robot-password` are _key references_ into a `hetzner` Secret
 you create separately (SOPS/sealed-secrets).
 
 ## Same as local, different provider
+
 The local mock (`../local-capd`) and this differ only in the **infrastructure
 provider**:
 
-| | local-capd | hetzner-caph |
-| --- | --- | --- |
-| machines | Docker containers | Hetzner servers (HCloudMachineTemplate) / bare-metal |
-| worker pool | a `MachineDeployment` (via ClusterClass) | a `MachineDeployment` (plain) |
-| add/remove machine | scale the worker pool | scale the worker pool |
+|                    | local-capd                               | hetzner-caph                                         |
+| ------------------ | ---------------------------------------- | ---------------------------------------------------- |
+| machines           | Docker containers                        | Hetzner servers (HCloudMachineTemplate) / bare-metal |
+| worker pool        | a `MachineDeployment` (via ClusterClass) | a `MachineDeployment` (plain)                        |
+| add/remove machine | scale the worker pool                    | scale the worker pool                                |
 
 **bex is byte-for-byte identical** on both — it only creates k8s Deployments/Services
 and reads `Node`s (see `operator/`). To go live:
@@ -27,4 +28,5 @@ kubectl create secret generic hetzner --from-literal=hcloud=$HCLOUD_TOKEN
 kubectl apply -f cluster.yaml
 # then point bex at the new cluster's kubeconfig (BEX_RUNTIME=kubernetes), unchanged.
 ```
+
 Not applied here (no Hetzner account); the manifest is structurally complete.

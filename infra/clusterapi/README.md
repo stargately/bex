@@ -12,8 +12,10 @@ under `deploy/gitops/base/cluster-api.yaml`) reconcile them into real nodes.
   `MachineDeployment` shape; provider-specific `*MachineTemplate`. [seam]
 
 **Add / remove a machine:**
+
 ```
 kubectl scale machinedeployment <name> --replicas=N     # or edit replicas
 # or: let cluster-autoscaler scale it from pending pods (annotations in base/)
 ```
+
 This is `bex-infra`; the bex control plane only observes the resulting `Node`s.

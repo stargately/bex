@@ -7,14 +7,14 @@
 
 bex's Go layer splits into **two collaborating components** — keep them distinct:
 
-| | **bex control plane** (planned) | **bex operator** (exists) |
-| --- | --- | --- |
-| role | **policy / intent** — business logic + the source of truth | **mechanism** — make reality match intent |
-| owns | tenants, apps, domains, plans/billing, quotas, auth | `App` CR → `Deployment` + `Service` + `Ingress` (+TLS) |
-| store | **Postgres** (durable, queryable, backed up) | **none** — it's a k8s controller; its "store" is the API/etcd |
-| interface | an API / web UI for users | watches `App` CRs; writes their `status` |
-| decides | *what should exist & who's allowed* | *how to run it* (rollout, health-gate, idle-hibernate) |
-| code | a Go service (`operator/` repo, separate binary) | `operator/internal/controller` (kubebuilder) |
+|           | **bex control plane** (planned)                            | **bex operator** (exists)                                     |
+| --------- | ---------------------------------------------------------- | ------------------------------------------------------------- |
+| role      | **policy / intent** — business logic + the source of truth | **mechanism** — make reality match intent                     |
+| owns      | tenants, apps, domains, plans/billing, quotas, auth        | `App` CR → `Deployment` + `Service` + `Ingress` (+TLS)        |
+| store     | **Postgres** (durable, queryable, backed up)               | **none** — it's a k8s controller; its "store" is the API/etcd |
+| interface | an API / web UI for users                                  | watches `App` CRs; writes their `status`                      |
+| decides   | _what should exist & who's allowed_                        | _how to run it_ (rollout, health-gate, idle-hibernate)        |
+| code      | a Go service (`operator/` repo, separate binary)           | `operator/internal/controller` (kubebuilder)                  |
 
 **Rule of thumb:** business/product logic lives in the **control plane**; the operator
 stays a thin, idempotent, **CR-driven** reconciler with **no DB** and no policy.
@@ -43,7 +43,7 @@ executes it. Either side can be developed/tested against that contract independe
 
 - **Durability.** Business data (who owns which app/domain) belongs in a real DB, backed
   up off-node. Today everything lives only in the single app node's **etcd** (`/var/lib/etcd`,
-  local disk, no HA) — a node *reboot* is fine, but a node *rebuild* loses it, and the App
+  local disk, no HA) — a node _reboot_ is fine, but a node _rebuild_ loses it, and the App
   is **not in git** (Apps are imperative by design). With Postgres as the truth, **etcd
   becomes a rebuildable projection**: lose the cluster, re-`project` from Postgres.
 - **Multi-tenant / BYOD.** Tenants, custom domains, plans, quotas are **relational business

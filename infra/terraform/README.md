@@ -2,7 +2,7 @@
 
 Day-0 substrate on Hetzner for the **infra (management) cluster** — the one CAPH
 lives in. Creates: SSH key + private network + firewall + **one small node running
-single-node k3s**. CAPH (and the app cluster it provisions) come *after*, on top of
+single-node k3s**. CAPH (and the app cluster it provisions) come _after_, on top of
 this k3s.
 
 **Not a one-shot.** State lives in Hetzner Object Storage (remote S3), so `apply`
@@ -28,14 +28,14 @@ runner itself. Everything above the first k3s is reconciled (CAPH, Argo, bex).
 
 ## Variables (all via `TF_VAR_*` / CI secrets)
 
-| var | default | note |
-| --- | --- | --- |
-| `hcloud_token` | — (secret) | Hetzner Cloud API token |
-| `ssh_public_key` | — (secret) | uploaded as `ssh_key_name`; **reused by CAPH** for app nodes |
-| `ssh_key_name` | `bex` | MUST match `sshKeys.hcloud.name` in the CAPH overlay |
-| `location` | `fsn1` | match the CAPH overlay's region |
-| `infra_server_type` | `cx33` | Intel cx line (3.5x cheaper than cpx for same specs); only CAPI controllers run here |
-| `allowed_ssh_cidrs` | `0.0.0.0/0` | **tighten in prod** (CI egress + admin IPs) |
+| var                 | default     | note                                                                                 |
+| ------------------- | ----------- | ------------------------------------------------------------------------------------ |
+| `hcloud_token`      | — (secret)  | Hetzner Cloud API token                                                              |
+| `ssh_public_key`    | — (secret)  | uploaded as `ssh_key_name`; **reused by CAPH** for app nodes                         |
+| `ssh_key_name`      | `bex`       | MUST match `sshKeys.hcloud.name` in the CAPH overlay                                 |
+| `location`          | `fsn1`      | match the CAPH overlay's region                                                      |
+| `infra_server_type` | `cx33`      | Intel cx line (3.5x cheaper than cpx for same specs); only CAPI controllers run here |
+| `allowed_ssh_cidrs` | `0.0.0.0/0` | **tighten in prod** (CI egress + admin IPs)                                          |
 
 ## First-run setup (one-time, out-of-band — the bottom turtle)
 

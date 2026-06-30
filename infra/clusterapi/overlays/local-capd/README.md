@@ -6,7 +6,9 @@ MachineDeployment + DockerMachineTemplate + KubeadmControlPlane) is written here
 it's reproducible and GitOps-able.
 
 Add/remove a machine:
+
 ```
 kubectl scale machinedeployment bex-md-0 --replicas=3   # against the kind infra cluster
 ```
+
 Each replica = a Docker-container node joining the app cluster.
