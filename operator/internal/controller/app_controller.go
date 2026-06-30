@@ -27,6 +27,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -136,6 +137,34 @@ func (r *AppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	return r.reconcileOpenSandbox(ctx, &app, image, port)
 }
 
+// tierResources maps an App tier (plan) to a fixed pod allocation, set as
+// requests == limits (Guaranteed). Empty/unknown tier => no constraints
+// (best-effort, prior behavior); the control plane sets a tier explicitly.
+// Ladder mirrors docs/control-plane.md.
+var tierResources = map[string]struct{ cpu, mem string }{
+	"free":      {"100m", "512Mi"},
+	"starter":   {"500m", "512Mi"},
+	"standard":  {"1", "2Gi"},
+	"pro":       {"2", "4Gi"},
+	"pro-plus":  {"4", "8Gi"},
+	"pro-max":   {"4", "16Gi"},
+	"pro-ultra": {"8", "32Gi"},
+}
+
+func resourcesForTier(tier string) corev1.ResourceRequirements {
+	t, ok := tierResources[tier]
+	if !ok {
+		return corev1.ResourceRequirements{} // unset => best-effort, unchanged behavior
+	}
+	mk := func() corev1.ResourceList {
+		return corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(t.cpu),
+			corev1.ResourceMemory: resource.MustParse(t.mem),
+		}
+	}
+	return corev1.ResourceRequirements{Requests: mk(), Limits: mk()}
+}
+
 // reconcileKubernetes runs the revision as a Deployment (+ ClusterIP k8s Service)
 // owned by the App — pods are scheduled onto the cluster's nodes (machines).
 func (r *AppReconciler) reconcileKubernetes(ctx context.Context, app *appv1alpha1.App, image string, port int) (ctrl.Result, error) {
@@ -152,10 +181,11 @@ func (r *AppReconciler) reconcileKubernetes(ctx context.Context, app *appv1alpha
 		dep.Spec.Selector = &metav1.LabelSelector{MatchLabels: labels}
 		dep.Spec.Template.ObjectMeta.Labels = labels
 		dep.Spec.Template.Spec.Containers = []corev1.Container{{
-			Name:  "app",
-			Image: image,
-			Env:   []corev1.EnvVar{{Name: "PORT", Value: strconv.Itoa(port)}},
-			Ports: []corev1.ContainerPort{{ContainerPort: int32(port)}},
+			Name:      "app",
+			Image:     image,
+			Env:       []corev1.EnvVar{{Name: "PORT", Value: strconv.Itoa(port)}},
+			Ports:     []corev1.ContainerPort{{ContainerPort: int32(port)}},
+			Resources: resourcesForTier(app.Spec.Tier),
 		}}
 		return controllerutil.SetControllerReference(app, dep, r.Scheme)
 	}); err != nil {

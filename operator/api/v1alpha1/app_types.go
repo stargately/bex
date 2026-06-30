@@ -70,6 +70,13 @@ type AppSpec struct {
 	// +optional
 	IdleTTLSeconds int32 `json:"idleTTLSeconds,omitempty"`
 
+	// Tier is the plan/size; the operator sets the pod's resources (requests==limits)
+	// from it. Empty => no resource constraints (best-effort); the control plane sets
+	// a tier explicitly. Resource ladder lives in docs/control-plane.md.
+	// +optional
+	// +kubebuilder:validation:Enum=free;starter;standard;pro;pro-plus;pro-max;pro-ultra
+	Tier string `json:"tier,omitempty"`
+
 	// Host is the external FQDN to expose this App at (e.g. "beancount.1.2.3.4.sslip.io",
 	// or a tenant's custom domain). On the kubernetes runtime the operator creates an
 	// Ingress (+ TLS via cert-manager) routing this host to the App's Service. Empty =>

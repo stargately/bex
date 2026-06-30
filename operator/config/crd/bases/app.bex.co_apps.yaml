@@ -113,6 +113,20 @@ spec:
                   Repo is the git repository URL (or local path) to deploy from. Either Repo
                   (build-from-git) or Image (prebuilt) must be set.
                 type: string
+              tier:
+                description: |-
+                  Tier is the plan/size; the operator sets the pod's resources (requests==limits)
+                  from it. Empty => no resource constraints (best-effort); the control plane sets
+                  a tier explicitly. Resource ladder lives in docs/control-plane.md.
+                enum:
+                - free
+                - starter
+                - standard
+                - pro
+                - pro-plus
+                - pro-max
+                - pro-ultra
+                type: string
             type: object
           status:
             description: status defines the observed state of App
