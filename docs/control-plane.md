@@ -59,6 +59,31 @@ Only the last row ties a tenant to dedicated machines — and even then it's "pi
 
 **In the control plane:** a tenant row → an isolation unit (namespace/vcluster/sandbox); its Apps deploy there and **bin-pack onto the shared worker pools**. An App that needs special hardware (GPU) lands on the matching pool via a _scheduling constraint_, not because the pool belongs to it.
 
+## Tiers (plans) → pod resources → machine provisioning
+
+A **tier/plan** (Free, Starter, Standard, Pro, …) is just a fixed **resource allocation** per pod — RAM + CPU, nothing more. The operator expresses it as the pod's `requests` = `limits` (that's k8s's only knob for "give this pod exactly X"); same mechanism for every tier, only the numbers differ.
+
+| tier (Render-style) | RAM    | CPU | pod `requests`=`limits` |
+| ------------------- | ------ | --- | ----------------------- |
+| Free                | 512 MB | 0.1 | `512Mi` / `100m`        |
+| Starter             | 512 MB | 0.5 | `512Mi` / `500m`        |
+| Standard            | 2 GB   | 1   | `2Gi` / `1`             |
+| Pro                 | 4 GB   | 2   | `4Gi` / `2`             |
+| Pro Plus            | 8 GB   | 4   | `8Gi` / `4`             |
+| Pro Max             | 16 GB  | 4   | `16Gi` / `4`            |
+| Pro Ultra           | 32 GB  | 8   | `32Gi` / `8`            |
+
+**Provisioning = bin-pack the sum, autoscale by the sum.** Pods of all tiers **bin-pack onto the shared worker pools** (scheduler `MostAllocated`, for density). The machine capacity you must run ≈ **Σ(running pods' tiers)**; as that sum grows the autoscaler/CAPI **adds a machine**, as it shrinks (after idle-evict) it **removes** one. There are **no per-tier pools** — a tier only sets how big the pod is.
+
+**Node size is bounded by the largest tier offered.** A `Pro Ultra` pod (32 GB/8 CPU) needs a node ≥ that — so either the pool uses big enough machines (on Hetzner a `ccx`/`cpx` with ≥32 GB) or the offered tiers are capped to what the node catalog holds.
+
+**The one real lever is the Free tier:**
+
+- **Reserve it** — Free also gets a real `512Mi/100m` slice → simplest; it counts in Σ, i.e. a small fixed cost per free app (not literally free to host).
+- **Sleep it** (`sleep = free`: idle free apps hibernate) → sleeping pods don't occupy, so you can pack **beyond** Σ (overcommit) and Free approaches \$0. Paid tiers always reserve.
+
+**Where it lives in bex:** `App.tier` (set from the plan in Postgres) → the operator translates it to the pod's `requests/limits`; the **auto-allocator** bin-packs + idle-evicts; CAPI / Cluster Autoscaler turns the aggregate into machines. _(Planned: the `tier` field on `App` and the autoscaler wiring — today pod resources are implicit and machine count is manual.)_
+
 ## One Postgres, owned by the control plane
 
 - **One instance**, not two — two Postgres for one product is wasted ops at this scale.
