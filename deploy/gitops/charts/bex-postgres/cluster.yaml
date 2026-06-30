@@ -1,0 +1,26 @@
+# The bex control-plane database — a CloudNativePG Cluster.
+# 1 instance for now (single-node app cluster); bump `instances` to 3 for HA later.
+# Storage is a Hetzner Cloud Volume (hcloud-csi) — separate from the node's local
+# disk, so it survives a node rebuild (unlike etcd). CNPG creates:
+#   - service  bex-db-rw   (read-write endpoint the control plane connects to)
+#   - secret   bex-db-app  (app user/password for database `bex`)
+# TODO(task 007): add spec.backup.barmanObjectStore -> Wasabi for off-cluster backups + PITR.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: bex-db
+  namespace: bex-system
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true # CRD may be mid-install
+spec:
+  instances: 1
+  storage:
+    size: 5Gi
+    storageClass: hcloud-volumes
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "1", memory: 1Gi }
+  bootstrap:
+    initdb:
+      database: bex
+      owner: bex

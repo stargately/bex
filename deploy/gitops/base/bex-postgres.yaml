@@ -1,0 +1,22 @@
+# The bex control-plane Postgres Cluster (CNPG), vendored in this repo (Argo reads it
+# via the SSH deploy key, like bex.yaml). sync-wave 2 so the CNPG operator + CRDs from
+# wave 1 exist first.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bex-postgres
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:stargately/bex.git
+    targetRevision: main
+    path: deploy/gitops/charts/bex-postgres
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bex-system
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true]

@@ -11,3 +11,5 @@ resources:
   - traefik.yaml                 # edge / ingress controller (Hetzner LB front door)
   - cert-manager.yaml            # automated Let's Encrypt TLS
   - cert-manager-issuers.yaml    # letsencrypt-staging + -prod ClusterIssuers (after cert-manager)
+  - cnpg-operator.yaml           # CloudNativePG operator (Postgres)
+  - bex-postgres.yaml            # the control-plane DB Cluster (db `bex`), after CNPG
