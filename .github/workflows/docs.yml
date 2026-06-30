@@ -1,0 +1,32 @@
+name: docs (prettier)
+
+# Keep Markdown consistently formatted. Markdown-only (`**/*.md`) so it never touches
+# the k8s/Helm YAML; .prettierignore excludes vendored/gitignored docs. Fix locally with:
+#   npx prettier@3.4.2 --write "**/*.md"
+on:
+  pull_request:
+    paths:
+      - "**/*.md"
+      - ".prettierrc.json"
+      - ".prettierignore"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: [main]
+    paths:
+      - "**/*.md"
+      - ".prettierrc.json"
+      - ".prettierignore"
+      - ".github/workflows/docs.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  prettier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npx --yes prettier@3.4.2 --check "**/*.md"

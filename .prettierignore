@@ -1,0 +1,13 @@
+# Prettier formats Markdown docs only (see .github/workflows/docs.yml: `prettier --check "**/*.md"`).
+# These paths are excluded from that glob.
+
+# gitignored / not ours
+projects-to-deploy/
+node_modules/
+.tmp/
+
+# vendored third-party chart (don't reformat upstream)
+deploy/gitops/charts/opensandbox-controller/
+
+# generated kustomize/CRD/RBAC output (not prose)
+operator/dist/
