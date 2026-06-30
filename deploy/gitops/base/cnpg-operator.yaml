@@ -20,4 +20,6 @@ spec:
     namespace: cnpg-system
   syncPolicy:
     automated: { prune: true, selfHeal: true }
-    syncOptions: [CreateNamespace=true]
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true # CNPG CRDs exceed kubectl's 256KB last-applied-config annotation limit
