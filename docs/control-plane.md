@@ -40,6 +40,25 @@ The **`App` CR is the contract**: the control plane writes intent into it; the o
 - **Multi-tenant / BYOD.** Tenants, custom domains, plans, quotas are **relational business data** with queries/joins/an API — not a fit for etcd (size-capped ~8 GB, no queries, no watch-as-a-database). A domain a tenant adds becomes a row → the control plane projects an `App`/Ingress → the operator + cert-manager issue TLS (Traefik routes new hosts with no reload — see [`docs/architecture.md`](architecture.md)).
 - **API/UI.** Users interact with rows through a product API, not `kubectl`.
 
+## Multi-tenancy: isolation units ≠ worker pools
+
+A tenant maps to an **isolation unit** (namespace / vcluster / sandbox), **not** to a worker pool — the two are orthogonal. A **worker pool** (`worker-0`, `worker-1`, …) is a group of identical **machines** that exists for _infrastructure_ reasons (CPU vs GPU vs ARM, region, spot vs on-demand); there are few of them and **all tenants share them**. A **tenant** is _who_ + isolation/billing, and there can be thousands.
+
+So **one pool per tenant is wrong**: each pool needs ≥1 machine, so it would mean ≥1 dedicated machine per tenant — cost blows up and it defeats bex's whole model (bin-pack many tenants' pods onto shared nodes, idle-evict, autoscale machines by _aggregate_ demand). `worker-1`/`worker-2` are added by machine _shape_, never per tenant.
+
+How a tenant is actually isolated (weak → strong; **all share the same worker pools**):
+
+| unit | strength | machines | use |
+| --- | --- | --- | --- |
+| **namespace / tenant** | soft (shared kernel) + RBAC/Quota/NetworkPolicy | shared | default; cheapest, densest |
+| **vcluster / tenant** | stronger API isolation (own apiserver view) | shared | the planned per-tenant vcluster |
+| **sandbox/microVM / workload** (OpenSandbox·Kata·Firecracker) | hard (own kernel) | **still shared** | bex's `sleep=free` runtime |
+| **dedicated nodes/pool / tenant** | physical | **dedicated** | **exception**: paid/compliance only |
+
+Only the last row ties a tenant to dedicated machines — and even then it's "pin tenant X's pods to a dedicated pool" via node **taints** + pod **nodeSelector/affinity**, a premium opt-in, not `worker-N = tenant N`.
+
+**In the control plane:** a tenant row → an isolation unit (namespace/vcluster/sandbox); its Apps deploy there and **bin-pack onto the shared worker pools**. An App that needs special hardware (GPU) lands on the matching pool via a _scheduling constraint_, not because the pool belongs to it.
+
 ## One Postgres, owned by the control plane
 
 - **One instance**, not two — two Postgres for one product is wasted ops at this scale.
