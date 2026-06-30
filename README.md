@@ -18,7 +18,7 @@ Today's brain is a **Go Kubernetes operator** that reconciles `App` CRs into run
   ║ control-plane node          worker machines (CAPI provisions these)        ║
   ║                                                                            ║
   ║ ┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐     ║
-  ║ │ bex-kn4d9          │  │ bex-md-0…2fn7c     │  │ bex-md-0…jw4sv     │     ║
+  ║ │ bex-kn4d9          │  │ bex-worker-0…2fn7c │  │ bex-worker-0…jw4sv │     ║
   ║ │ apiserver · etcd   │  │                    │  │                    │     ║
   ║ │ scheduler · CM     │  │ [ whoami  pod ]    │  │ [ whoami  pod ]    │     ║
   ║ └────────────────────┘  │                    │  │                    │     ║
@@ -113,7 +113,7 @@ kubectl -n bex-system rollout status deploy/bex-controller-manager   # operator 
 
 # 3. deploy an App — the in-cluster operator reconciles it; pods land on the worker machines
 kubectl apply -f examples/whoami-app.yaml
-kubectl get pods -l app.bex.co/app=whoami -o wide   # see them on bex-md-0-* nodes
+kubectl get pods -l app.bex.co/app=whoami -o wide   # see them on bex-worker-0-* nodes
 
 # 4. ★ add a machine, then scale the App onto it
 bash scripts/mock-cluster.sh scale 2    # worker pool 1 -> 2 (a new container node joins)
@@ -164,7 +164,7 @@ Tracked next: the **bex control plane** — a Postgres **source of truth** (tena
 │           ✦ bex operator (bex-controller-manager) ✦             │
 │           calico · coredns · kube-proxy                          │
 │                                                                  │
-│ bex-md-0-bvbsk-...          ▸ worker 节点                        │
+│ bex-worker-0-bvbsk-...      ▸ worker 节点                        │
 │   └ pod:  beancount-cms ×2   ← 你的应用                         │
 │           calico · kube-proxy                                    │
 │                                                                  │

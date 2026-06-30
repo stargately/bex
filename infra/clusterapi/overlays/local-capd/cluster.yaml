@@ -400,5 +400,5 @@ spec:
     workers:
       machineDeployments:
       - class: default-worker
-        name: md-0
+        name: worker-0
         replicas: 1

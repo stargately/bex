@@ -14,8 +14,8 @@ WL_KUBECONFIG=infra/local/bex.kubeconfig
 
 scale() {
   kubectl --context "$MGMT" patch cluster bex --type merge \
-    -p "{\"spec\":{\"topology\":{\"workers\":{\"machineDeployments\":[{\"name\":\"md-0\",\"class\":\"default-worker\",\"replicas\":$1}]}}}}"
-  echo "worker pool -> $1 machine(s); watch: docker ps --format '{{.Names}}' | grep bex-md-0"
+    -p "{\"spec\":{\"topology\":{\"workers\":{\"machineDeployments\":[{\"name\":\"worker-0\",\"class\":\"default-worker\",\"replicas\":$1}]}}}}"
+  echo "worker pool -> $1 machine(s); watch: docker ps --format '{{.Names}}' | grep bex-worker-0"
 }
 if [ "${1:-}" = scale ]; then scale "${2:?usage: scale N}"; exit 0; fi
 
