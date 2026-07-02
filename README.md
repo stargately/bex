@@ -6,52 +6,45 @@ Today's brain is a **Go Kubernetes operator** that reconciles `App` CRs into run
 
 ## Panorama
 
-```
-  dev   $ kubectl apply -f App.yaml   ─▶ the app cluster's apiserver
-    │
-    ▼
-  ╔══ APP CLUSTER ═════════════════════ substrate · bex + your Apps run here ══╗
-  ║ ▸ BEX OPERATOR · bex  —  a POD in this cluster   (watches App CRs)         ║
-  ║     reconcile App → Deployment + Service ──▶ pods on the workers below     ║
-  ║     local mock: pinned to the control-plane node (see note ‡)              ║
-  ║                                                                            ║
-  ║ control-plane node          worker machines (CAPI provisions these)        ║
-  ║                                                                            ║
-  ║ ┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐     ║
-  ║ │ bex-kn4d9          │  │ bex-worker-0…2fn7c │  │ bex-worker-0…jw4sv │     ║
-  ║ │ apiserver · etcd   │  │                    │  │                    │     ║
-  ║ │ scheduler · CM     │  │ [ whoami  pod ]    │  │ [ whoami  pod ]    │     ║
-  ║ └────────────────────┘  │                    │  │                    │     ║
-  ║                         └────────────────────┘  └────────────────────┘     ║
-  ║                                                                            ║
-  ║ add a machine ⇒ new node joins · pods bin-pack onto it                     ║
-  ╚════════════════════════════════════════════════════════════════════════════╝
-        ▲ image pull                                ▲ Cluster API provisions
-        │  bex-zot · registry container (:5050)     │ these machines (add ⇄ remove)
-        │  (pods pull their image from here)        │
-        └──────────────────────────────┐            │
-                                        ▼            │
-  ╔══ INFRA CLUSTER ═════════════════════════════════════ bex-infra · infra/ ══╗
-  ║ machine ×1   —   kind node   bex-mgmt-control-plane                        ║
-  ║ Cluster API pods:  capi · capd · kubeadm-bootstrap · kubeadm-cp            ║
-  ║ CAPD → Docker container (local mock)   ·   CAPH → Hetzner server (prod)    ║
-  ╚════════════════════════════════════════════════════════════════════════════╝
+```mermaid
+%% arrow  A --> B  means  "A depends on B"  (points to what it needs)
+flowchart TB
+  dev["dev · kubectl"]
+  subgraph app["APP CLUSTER · substrate — bex + your Apps run here"]
+    api["📦 apiserver · etcd · scheduler"]
+    op["📦 bex operator"]
+    apppod["📦 App pod"]
+    zot["📦 bex-zot · zot-0"]
+    cpnode["control-plane node · machine"]
+    wnode["worker node · machine"]
+  end
+  subgraph infra["INFRA CLUSTER · bex-infra"]
+    capi["📦 Cluster API controllers"]
+  end
+  dev -->|"submits App CR via"| api
+  op -->|"apiserver client · watch CRs, write Deployment"| api
+  apppod -->|"managed by"| op
+  apppod -->|"image from"| zot
+  apppod -->|"runs on"| wnode
+  zot -->|"runs on"| wnode
+  api -->|"runs on"| cpnode
+  op -->|"runs on"| cpnode
+  wnode -->|"provisioned by"| capi
+  cpnode -->|"provisioned by"| capi
 
-  ── alternate runtime ─ BEX_RUNTIME=opensandbox ─ single host · NOT the k8s path ──
-     host OpenSandbox (:8077) → sandbox container  [ hello-go ]    real pause/resume
-     k8s variant: opensandbox-controller in the legacy  orbstack  vcluster (acme)
-
-  levels   machine = a server (Hetzner) / Docker container (local mock)
-           cluster = k8s built FROM machines      pod = a process inside a cluster
-  layers   · bex        operator/  — runs as a POD in the app cluster
-           · bex-infra  infra/      — the INFRA CLUSTER (Cluster API)
-           · substrate  the app cluster (bex-infra builds it · bex+Apps run in it)
-  names    infra cluster / app cluster = Cluster API's management / workload cluster
-  count    machines = 1 (infra) + 1 control-plane + 2 workers.  BEX OPERATOR, CAPI and
-           zot are pods/containers — NOT extra machines.  Nothing runs on your laptop.
-  ‡ local mock only: pinned to the cp node because OrbStack/Calico can't route cross-
-    node pod→apiserver (same gap crashes calico-kube-controllers); real CNI needs no pin.
+  classDef pod fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+  classDef machine fill:#e5e7eb,stroke:#374151
+  class api,op,apppod,zot,capi pod
+  class cpnode,wnode machine
 ```
+
+**Every arrow is a dependency: `A → B` means _A depends on B_** (it points to what A needs). **Blue 📦 = Pod · gray = machine (k8s node).**
+
+- An **App pod** depends on the **operator** (which manages it), **`bex-zot`** (pulls its image), and the **worker node** (runs on it).
+- The **operator** depends on the **apiserver** — it's a **client** of it: it watches `App` CRs and writes Deployments; it **never talks to pods directly**. (Plus the node it runs on.)
+- Both **machines** depend on **Cluster API** — it provisions them.
+
+Note the direction: "operator _creates_ pod" becomes **`pod → operator`**, and "CAPI _provisions_ machine" becomes **`machine → CAPI`** — in a dependency graph the created/managed thing points at what it depends on, i.e. the arrow is the reverse of the "who-makes-what" flow. Outer boxes = the two **clusters**; a _machine_ is a server (Hetzner) or Docker container (local). Swap `CAPD`→`CAPH` and the picture is identical. (For a request/response view of a deploy, see the request-flow diagram in [`docs/control-plane.md`](docs/control-plane.md).)
 
 > **"control plane" is overloaded — three distinct things.** (1) The **BEX OPERATOR** (`· bex`) — a pod that _executes_ deploys (reconciles `App` CRs → Deployment/Service/ Ingress); a **client** of the apiserver, runs in-cluster, never on your laptop. (2) The **control-plane node** (apiserver/etcd/scheduler) — the _cluster's_ own master. (3) The **bex control plane** _(planned)_ — a Postgres-backed service that _decides_ intent (tenants/apps/domains + business logic) and writes the `App` CRs the operator executes; see [`docs/control-plane.md`](docs/control-plane.md). Today there is no (3): you `kubectl apply` App CRs directly.
 
@@ -147,32 +140,3 @@ scripts/         mock-cluster.sh · up.sh · deploy-sample.sh · start-opensandb
 Working & verified: the **Go control plane** (App CRD + reconcile, finalizer teardown); the **kubernetes runtime** (App → Deployment → pods on machines); the **local CAPD mock** with **add/remove machine** and pods bin-packing onto added machines; the **opensandbox runtime** (build CNB/Dockerfile → Zot → sandbox, real pause/resume); the **Hetzner CAPH overlay** (manifest committed, not applied — no account).
 
 Tracked next: the **bex control plane** — a Postgres **source of truth** (tenants / apps / domains + business logic) that projects to `App` CRs, so business data is durable and queryable instead of living only in the app cluster's **etcd** (lost on a node _rebuild_; Apps are imperative, not in git) — see [`docs/control-plane.md`](docs/control-plane.md); the **wake activator** + **HMAC webhook** (not yet ported); **Cluster Autoscaler** wiring so add/remove-machine is reactive (not manual); in-cluster builds (BuildKit/kpack Job) so build-from-git images are pullable by cluster nodes. The **edge (HTTPS via `App.spec.host`)** is live — Traefik + cert-manager. See [`docs/architecture.md`](docs/architecture.md).
-
-```
-┌─ INFRA CLUSTER ─────────────────────────────────────────────────┐
-│ bex-mgmt-control-plane      ▸ control-plane 节点                 │
-│                               (单节点集群,所以它既是 master,    │
-│                                也跑下面这些 CAPI pod)            │
-│   └ pod:  capi-controller   capd-controller                     │
-│           kubeadm-bootstrap  kubeadm-control-plane               │
-│           cert-manager ×3                                        │
-└──────────────────────────────────────────────────────────────────┘
-
-┌─ APP CLUSTER ───────────────────────────────────────────────────┐
-│ bex-f9zs5-4xdjn             ▸ control-plane 节点                 │
-│   └ pod:  etcd · apiserver · scheduler · controller-manager     │
-│           ✦ bex operator (bex-controller-manager) ✦             │
-│           calico · coredns · kube-proxy                          │
-│                                                                  │
-│ bex-worker-0-bvbsk-...      ▸ worker 节点                        │
-│   └ pod:  beancount-cms ×2   ← 你的应用                         │
-│           calico · kube-proxy                                    │
-│                                                                  │
-│ bex-lb                      ▸ 不是 k8s 节点(haproxy LB 机器)    │
-│                               把外部请求转给上面的 apiserver     │
-└──────────────────────────────────────────────────────────────────┘
-
-┌─ REGISTRY ──────────────────────────────────────────────────────┐
-│ bex-zot                     ▸ 不是 k8s 节点(独立 registry 容器) │
-└──────────────────────────────────────────────────────────────────┘
-```

@@ -15,24 +15,30 @@ bex's Go layer splits into **two collaborating components** — keep them distin
 
 **Rule of thumb:** business/product logic lives in the **control plane**; the operator stays a thin, idempotent, **CR-driven** reconciler with **no DB** and no policy.
 
-## Data flow
+## Request flow: a tenant hosts a new service
 
-```
-users / API / web UI
-      │
-bex control plane  (Go service + Postgres)        ← source of truth + business logic
-  - auth · tenants · plans/billing · quotas
-  - app/domain CRUD + validation + domain verification (BYOD)
-  - reconciles rows → creates/updates App CRs (k8s API)
-      │  (App CR = the contract between the two)
-      ▼
-App CRs  (in etcd)  ──watched by──▶  bex operator  ← mechanism, no Postgres
-      │ reconcile
-      ▼
-Deployment · Service · Ingress (+cert-manager TLS)  →  Hetzner / k8s runtime
+Users call the **control plane**, never the operator — the operator has no user-facing API; it's an internal k8s controller at the **tail** of the pipeline.
+
+```mermaid
+flowchart TB
+  tenant["tenant · Web UI / API / CLI"]
+  cp["bex control plane<br/>Go service · source of truth"]
+  pg[("Postgres")]
+  cr["App CR · etcd"]
+  op["bex operator<br/>mechanism · no DB"]
+  run["Deployment · Service · Ingress (+TLS)<br/>→ running service (https)"]
+  tenant -->|"① POST /apps — sync call"| cp
+  cp -->|"② write row"| pg
+  cp -->|"③ project → App CR"| cr
+  cr -->|"④ watched by"| op
+  op -->|"⑤ reconcile"| run
 ```
 
-The **`App` CR is the contract**: the control plane writes intent into it; the operator executes it. Either side can be developed/tested against that contract independently.
+What the pipeline gets right — and the mistakes to avoid:
+
+- **Users never call the operator; the control plane is the front door.** Don't route `tenant → operator` (it has no API) or `operator → control plane` (the operator is _downstream_ of CRs, not upstream). The operator is always at the tail.
+- **Only the first hop is a synchronous "call".** `tenant → control plane` is request/response (returns once the row is written). Everything after — `control plane → App CR → operator → runtime` — is **declarative and eventually consistent**: the control plane writes _desired state_ (a CR), the operator _reconciles_ it asynchronously (level-triggered, not RPC). The App's `status.url` appears once reconcile finishes.
+- **The `App` CR is the contract.** The control plane writes intent; the operator executes it. Either side can be built/tested against that contract independently.
 
 ## Why a Postgres source of truth (the durability + product case)
 

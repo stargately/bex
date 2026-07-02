@@ -44,18 +44,13 @@ Business/product logic belongs in the **control plane**; the operator stays a th
 - Nuance: the Cluster API/autoscaler **controllers** are deployed (`deploy/`), but the **desired node pools** they consume (`Cluster`/`MachineDeployment`) are declared in `infra/`. Engine = deploy, desired-infra = infra.
 - A third thing is **neither**: bex deploying a _user's_ repo into a sandbox — that's the **product runtime**, not GitOps and not infra.
 
-```
-day-0    you / CI ──(terraform · clusterctl)──▶ infra/ ──▶ clusters & machines exist
- outside                                                    (infra cluster + app-cluster nodes)
-                                                               │ Argo CD installed in-cluster
-                                                               ▼
-day-1    Argo CD ──(reconcile)──▶ deploy/gitops/ ──▶ platform pods
- inside                                               Zot · OpenSandbox-ctrl · CAPI · BEX OPERATOR
-                                                               │
-                                                               ▼
-product  user `git push` ─▶ BEX OPERATOR ─▶ build (CNB/Dockerfile → Zot) ─▶ run a revision:
- runtime  (bex's own loop,                                  · k8s          → Deployment + pods on nodes
-          not GitOps)                                       · opensandbox  → a sandbox (pause/resume)
+```mermaid
+flowchart TB
+  ci["you / CI · from outside"] -->|"terraform · clusterctl"| infra["day-0 · infra/ → clusters and machines exist"]
+  infra -->|"Argo CD installed in-cluster"| gitops["day-1+ · Argo reconciles deploy/gitops/<br/>Zot · OpenSandbox · CAPI · bex operator"]
+  gitops --> push["user git push"]
+  push -->|"bex's own loop · not GitOps"| op["product runtime · bex operator"]
+  op -->|"build CNB/Dockerfile → Zot → run a revision"| rev["k8s → Deployment+pods · or · opensandbox → sandbox"]
 ```
 
 ## Local CAPD mock → Hetzner CAPH (the portability bet)
